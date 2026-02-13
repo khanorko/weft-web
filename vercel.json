@@ -1,0 +1,9 @@
+{
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "framework": null,
+  "rewrites": [
+    { "source": "/api/groq", "destination": "/api/groq.js" },
+    { "source": "/api/gemini-image", "destination": "/api/gemini-image.js" }
+  ]
+}
