@@ -1,0 +1,42 @@
+# Weft
+
+> AI-powered news aggregator that curates and summarizes the most relevant tech and AI articles.
+
+Weft aggregates RSS feeds from 20+ sources across AI news, major tech publications, thought leaders, design/UX, and company blogs. It uses LLMs to score articles by relevance to user interests and generate summaries.
+
+## Features
+
+- Smart Filter: AI scores articles 1-10 based on user-defined interests
+- AI Summaries: Auto-generated via Groq (Llama 3.3 70B) with multiple styles (newsletter, TL;DR, bullets, executive brief)
+- Custom Styles: Users can create and save custom summary prompts
+- Feed Management: Toggle default feeds on/off, add custom RSS sources
+- AI Images: Gemini Imagen generates article illustrations when OG images are missing
+- PWA: Installable as app, works offline for cached content
+
+## Default Sources
+
+### Daily News
+- The Rundown AI, Hacker News, Last Week in AI, Import AI, The Batch
+
+### Major Publications
+- MIT Tech Review, Ars Technica, The Verge AI, Wired AI, VentureBeat AI, TechCrunch AI
+
+### Thought Leaders
+- Ethan Mollick (One Useful Thing), Gary Marcus, Zvi Mowshowitz, Interconnects
+
+### Design & UX
+- Jakob Nielsen, UX Collective, Nielsen Norman Group
+
+### Company Blogs
+- OpenAI, Hugging Face
+
+## Tech Stack
+
+- Frontend: Vanilla JavaScript, CSS custom properties, responsive design
+- Backend: Vercel serverless functions (Groq proxy, CORS proxy, Gemini image)
+- AI: Groq (Llama 3.3 70B for summaries, Llama 3.1 8B for scoring), Google Gemini Imagen 4.0 for images
+- Storage: Browser localStorage
+
+## URL
+
+https://weft-web.vercel.app

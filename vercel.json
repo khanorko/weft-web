@@ -4,6 +4,7 @@
   "framework": null,
   "rewrites": [
     { "source": "/api/groq", "destination": "/api/groq.js" },
-    { "source": "/api/gemini-image", "destination": "/api/gemini-image.js" }
+    { "source": "/api/gemini-image", "destination": "/api/gemini-image.js" },
+    { "source": "/api/cors-proxy", "destination": "/api/cors-proxy.js" }
   ]
 }

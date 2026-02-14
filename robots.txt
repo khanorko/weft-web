@@ -1,0 +1,36 @@
+# Weft — Pattern from noise
+# AI-powered news aggregator
+
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# AI Search Crawlers
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+Sitemap: https://weft-web.vercel.app/sitemap.xml

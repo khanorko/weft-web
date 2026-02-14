@@ -4,8 +4,69 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Weft — Pattern from noise</title>
+    <meta name="description" content="AI-powered news aggregator. Curates and summarizes the most relevant tech and AI articles for you.">
+    <meta name="theme-color" content="#0a0a0b">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://weft-web.vercel.app/">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Weft — Pattern from noise">
+    <meta property="og:description" content="AI-powered news aggregator that curates and summarizes the most relevant tech and AI articles.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://weft-web.vercel.app/">
+    <meta property="og:site_name" content="Weft">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="https://weft-web.vercel.app/icon-512.png">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Weft — Pattern from noise">
+    <meta name="twitter:description" content="AI-powered news aggregator that curates and summarizes the most relevant tech and AI articles.">
+    <meta name="twitter:image" content="https://weft-web.vercel.app/icon-512.png">
+
+    <!-- Schema.org -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Weft",
+        "url": "https://weft-web.vercel.app",
+        "description": "AI-powered news aggregator that curates and summarizes the most relevant tech and AI articles for you.",
+        "applicationCategory": "NewsApplication",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requires JavaScript",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "author": {
+            "@type": "Person",
+            "name": "Johan Salo"
+        },
+        "featureList": [
+            "AI-powered article scoring and ranking",
+            "AI-generated summaries via Groq/Llama",
+            "20+ curated RSS feeds",
+            "Custom feed management",
+            "Bookmark and filter articles",
+            "PWA installable"
+        ]
+    }
+    </script>
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/icon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+
+    <!-- Fonts (preconnect instead of CSS @import) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap">
+
     <link rel="stylesheet" href="style.css">
-    <!-- Fonts loaded via CSS @import -->
 </head>
 <body>
     <div class="app">
@@ -14,12 +75,12 @@
             <header class="sidebar-header">
                 <h1>Weft</h1>
                 <div class="header-actions">
-                    <button id="refreshBtn" class="icon-btn" title="Refresh feeds">
+                    <button id="refreshBtn" class="icon-btn" title="Refresh feeds" aria-label="Refresh feeds">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
                         </svg>
                     </button>
-                    <button id="settingsBtn" class="icon-btn" title="Settings">
+                    <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
                         </svg>
@@ -28,19 +89,20 @@
             </header>
 
             <div class="search-box">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <label for="searchInput" class="sr-only">Search articles</label>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
                 </svg>
                 <input type="text" id="searchInput" placeholder="Search articles...">
             </div>
 
-            <div class="filters">
-                <button class="filter-btn active" data-filter="smart">Smart</button>
+            <nav class="filters" aria-label="Article filters">
+                <button class="filter-btn active" data-filter="smart" title="AI-ranked by your interests (set in Settings)">Smart</button>
                 <button class="filter-btn" data-filter="all">All</button>
                 <button class="filter-btn" data-filter="unread">Unread</button>
-                <button class="filter-btn" data-filter="top">Top Rated</button>
-                <button class="filter-btn" data-filter="bookmarked">Bookmarked</button>
-            </div>
+                <button class="filter-btn" data-filter="top" title="Score 8+">Top</button>
+                <button class="filter-btn" data-filter="bookmarked">Saved</button>
+            </nav>
 
             <div class="article-list" id="articleList">
                 <div class="loading">Loading articles...</div>
@@ -68,7 +130,7 @@
     </div>
 
     <!-- Settings Modal -->
-    <div class="modal" id="settingsModal">
+    <div class="modal" id="settingsModal" role="dialog" aria-modal="true" aria-label="Settings">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Settings</h2>
@@ -85,6 +147,16 @@
                 <div class="setting-group" id="ownKeyGroup" style="display: none;">
                     <label>Your Groq API Key</label>
                     <input type="password" id="apiKey" placeholder="gsk_...">
+                </div>
+                <div class="setting-group">
+                    <label>RSS Sources</label>
+                    <div id="feedManager" class="feed-manager"></div>
+                    <div class="feed-add-row">
+                        <input type="text" id="newFeedName" placeholder="Name">
+                        <input type="text" id="newFeedUrl" placeholder="RSS URL">
+                        <button class="btn-secondary" id="addFeedBtn">Add</button>
+                    </div>
+                    <small>Toggle sources on/off or add your own RSS feeds</small>
                 </div>
                 <div class="setting-group">
                     <label>Smart Filter — Your Interests</label>
@@ -145,6 +217,11 @@
     </div>
 
     <div class="toast-container" id="toastContainer"></div>
-    <script src="app.js"></script>
+    <script src="app.js" defer></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
 </body>
 </html>

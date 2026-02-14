@@ -1,7 +1,7 @@
 // Weft — Pattern from noise (Web Version)
 // Credits: Kristoffer Åström (idea), Johan Salo (implementation)
 
-const RSS_FEEDS = [
+const DEFAULT_FEEDS = [
     // Tier 1: Daily News
     { name: 'The Rundown AI', url: 'https://rss.beehiiv.com/feeds/2R3C6Bt5wj.xml', category: 'daily' },
     { name: 'Hacker News', url: 'https://hnrss.org/frontpage', category: 'daily' },
@@ -33,7 +33,16 @@ const RSS_FEEDS = [
     { name: 'Hugging Face', url: 'https://huggingface.co/blog/feed.xml', category: 'company' },
 ];
 
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+// Feed management: merge defaults with user customizations
+let disabledFeeds = JSON.parse(localStorage.getItem('disabledFeeds') || '[]');
+let customFeeds = JSON.parse(localStorage.getItem('customFeeds') || '[]');
+
+function getActiveFeeds() {
+    const all = [...DEFAULT_FEEDS, ...customFeeds];
+    return all.filter(f => !disabledFeeds.includes(f.url));
+}
+
+const CORS_PROXY = '/api/cors-proxy?url=';
 
 // Preset prompts
 const PRESET_PROMPTS = {
@@ -149,6 +158,71 @@ function setupEventListeners() {
             if (article) showArticle(article);
         }
     });
+
+    // Add feed button
+    document.getElementById('addFeedBtn').addEventListener('click', addCustomFeed);
+}
+
+// ==================== FEED MANAGER ====================
+
+function renderFeedManager() {
+    const container = document.getElementById('feedManager');
+    const allFeeds = [...DEFAULT_FEEDS.map(f => ({ ...f, isDefault: true })), ...customFeeds.map(f => ({ ...f, isDefault: false }))];
+
+    container.innerHTML = allFeeds.map(feed => {
+        const enabled = !disabledFeeds.includes(feed.url);
+        return `
+            <div class="feed-item">
+                <input type="checkbox" ${enabled ? 'checked' : ''} data-url="${feed.url}" onchange="toggleFeed(this)">
+                <span class="feed-name">${feed.name}</span>
+                <span class="feed-category">${feed.category}</span>
+                ${!feed.isDefault ? `<button class="feed-remove" onclick="removeCustomFeed('${feed.url}')" title="Remove">&times;</button>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function toggleFeed(checkbox) {
+    const url = checkbox.dataset.url;
+    if (checkbox.checked) {
+        disabledFeeds = disabledFeeds.filter(u => u !== url);
+    } else {
+        disabledFeeds.push(url);
+    }
+    localStorage.setItem('disabledFeeds', JSON.stringify(disabledFeeds));
+}
+
+function addCustomFeed() {
+    const nameInput = document.getElementById('newFeedName');
+    const urlInput = document.getElementById('newFeedUrl');
+    const name = nameInput.value.trim();
+    const url = urlInput.value.trim();
+
+    if (!name || !url) {
+        showToast('Enter both name and URL');
+        return;
+    }
+
+    const allUrls = [...DEFAULT_FEEDS, ...customFeeds].map(f => f.url);
+    if (allUrls.includes(url)) {
+        showToast('Feed already exists');
+        return;
+    }
+
+    customFeeds.push({ name, url, category: 'custom' });
+    localStorage.setItem('customFeeds', JSON.stringify(customFeeds));
+    nameInput.value = '';
+    urlInput.value = '';
+    renderFeedManager();
+    showToast(`Added "${name}"`);
+}
+
+function removeCustomFeed(url) {
+    customFeeds = customFeeds.filter(f => f.url !== url);
+    disabledFeeds = disabledFeeds.filter(u => u !== url);
+    localStorage.setItem('customFeeds', JSON.stringify(customFeeds));
+    localStorage.setItem('disabledFeeds', JSON.stringify(disabledFeeds));
+    renderFeedManager();
 }
 
 function loadCustomStyles() {
@@ -165,7 +239,8 @@ function loadCustomStyles() {
 
 function openSettings() {
     settingsModal.classList.add('open');
-    onStyleChange(); // Load current prompt
+    onStyleChange();
+    renderFeedManager();
 }
 
 function onStyleChange() {
@@ -309,7 +384,7 @@ async function loadArticles(forceRefresh = false) {
 
     try {
         const allArticles = [];
-        const feedPromises = RSS_FEEDS.map(feed =>
+        const feedPromises = getActiveFeeds().map(feed =>
             fetchFeed(feed).catch(e => {
                 console.error(`Error fetching ${feed.name}:`, e);
                 return [];
@@ -420,6 +495,12 @@ function cleanHTML(html) {
     return doc.body.textContent || '';
 }
 
+function escapeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 // Generate unique hash from string
 function hashCode(str) {
     let hash = 0;
@@ -500,7 +581,7 @@ function renderArticles() {
                     ${scoreBadge}
                 </div>
                 <h3>${article.title}</h3>
-                ${article.groqSummary ? `<p class="groq-summary">${article.groqSummary}</p>` : ''}
+                ${article.groqSummary ? `<p class="groq-summary">${escapeHTML(article.groqSummary)}</p>` : ''}
                 <div class="article-meta">
                     <span>${article.source}</span>
                     <span>${formatDate(article.date)}</span>
@@ -604,6 +685,11 @@ function showArticle(article) {
     // Show mobile content panel
     showMobileContent();
 
+    // Auto-generate summary if not already cached
+    if (!article.summary) {
+        generateSummary(article.id);
+    }
+
     // Fetch and display OG image with fade-in, fallback to AI-generated image
     fetchOGImage(article.link).then(async imageUrl => {
         const imageContainer = document.getElementById('articleImage');
@@ -626,6 +712,8 @@ function showArticle(article) {
 }
 
 function formatSummary(summary) {
+    const e = escapeHTML;
+
     // Try to parse structured summary (WHAT: / WHY IT MATTERS: / KEY INSIGHT:)
     const whatMatch = summary.match(/WHAT:\s*(.+?)(?=WHY IT MATTERS:|$)/is);
     const whyMatch = summary.match(/WHY IT MATTERS:\s*(.+?)(?=KEY INSIGHT:|$)/is);
@@ -637,19 +725,19 @@ function formatSummary(summary) {
                 ${whatMatch ? `
                     <div class="summary-point">
                         <span class="point-label">What</span>
-                        <span class="point-content">${whatMatch[1].trim()}</span>
+                        <span class="point-content">${e(whatMatch[1].trim())}</span>
                     </div>
                 ` : ''}
                 ${whyMatch ? `
                     <div class="summary-point">
                         <span class="point-label">Why it matters</span>
-                        <span class="point-content">${whyMatch[1].trim()}</span>
+                        <span class="point-content">${e(whyMatch[1].trim())}</span>
                     </div>
                 ` : ''}
                 ${insightMatch ? `
                     <div class="key-insight">
                         <div class="key-insight-label">Key Insight</div>
-                        <p>${insightMatch[1].trim()}</p>
+                        <p>${e(insightMatch[1].trim())}</p>
                     </div>
                 ` : ''}
             </div>
@@ -657,17 +745,17 @@ function formatSummary(summary) {
     }
 
     // Check for bullet points
-    if (summary.includes('•') || summary.includes('-')) {
+    if (summary.includes('\u2022') || summary.includes('-')) {
         const lines = summary.split(/\n/).filter(l => l.trim());
         const bullets = lines.map(line => {
-            const cleaned = line.replace(/^[•\-\*]\s*/, '').trim();
-            return cleaned ? `<li>${cleaned}</li>` : '';
+            const cleaned = line.replace(/^[\u2022\-\*]\s*/, '').trim();
+            return cleaned ? `<li>${e(cleaned)}</li>` : '';
         }).join('');
         return `<ul style="list-style: none; padding: 0; margin: 0;">${bullets}</ul>`;
     }
 
-    // Default: just show as paragraph with better line breaks
-    return `<p>${summary.replace(/\n\n/g, '</p><p style="margin-top: 12px;">').replace(/\n/g, '<br>')}</p>`;
+    // Default: escape and add line breaks
+    return `<p>${e(summary).replace(/\n\n/g, '</p><p style="margin-top: 12px;">').replace(/\n/g, '<br>')}</p>`;
 }
 
 function toggleLike(id) {
