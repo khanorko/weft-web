@@ -120,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
     loadArticles();
     setupEventListeners();
+    setupSidebarResize();
 });
 
 function setupEventListeners() {
@@ -1339,6 +1340,49 @@ Rules:
             </svg>
             Copy as LinkedIn post`;
     }
+}
+
+// ==================== SIDEBAR RESIZE ====================
+
+function setupSidebarResize() {
+    const handle = document.getElementById('sidebarResize');
+    const sidebar = document.querySelector('.sidebar');
+    if (!handle || !sidebar || isMobile) return;
+
+    const saved = localStorage.getItem('sidebarWidth');
+    if (saved) {
+        const w = parseInt(saved);
+        sidebar.style.width = w + 'px';
+        sidebar.style.minWidth = w + 'px';
+        document.documentElement.style.setProperty('--sidebar-width', w + 'px');
+    }
+
+    let dragging = false;
+
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        dragging = true;
+        handle.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const w = Math.max(320, Math.min(700, e.clientX));
+        sidebar.style.width = w + 'px';
+        sidebar.style.minWidth = w + 'px';
+        document.documentElement.style.setProperty('--sidebar-width', w + 'px');
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        localStorage.setItem('sidebarWidth', parseInt(sidebar.style.width));
+    });
 }
 
 // Mobile navigation
