@@ -128,7 +128,10 @@ function setupEventListeners() {
     settingsBtn.addEventListener('click', openSettings);
     closeSettings.addEventListener('click', () => settingsModal.classList.remove('open'));
     saveSettingsBtn.addEventListener('click', saveSettings);
-    searchInput.addEventListener('input', filterArticles);
+    searchInput.addEventListener('input', handleSearch);
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleSearch();
+    });
 
     // Summary style change - show prompt
     summaryStyleSelect.addEventListener('change', onStyleChange);
@@ -550,6 +553,16 @@ function renderArticles() {
         filtered = filtered.filter(a => !a.read);
     } else if (filter === 'bookmarked') {
         filtered = filtered.filter(a => a.bookmarked);
+    } else if (filter === 'discover') {
+        const topSources = getTopReadSources(5);
+        filtered = filtered
+            .filter(a => {
+                const score = articleScores[a.id];
+                return score !== undefined && score >= 3 && score <= 7 &&
+                    !topSources.includes(a.source);
+            })
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 15);
     }
 
     if (search) {
@@ -601,11 +614,148 @@ function renderArticles() {
     articleCount.textContent = `${filtered.length} articles`;
 }
 
+let searchDebounceTimer = null;
+
+function handleSearch() {
+    const query = searchInput.value.trim();
+
+    clearTimeout(searchDebounceTimer);
+
+    const isQuestion = query.length > 10 && (
+        query.endsWith('?') ||
+        /^(what|why|how|when|who|which|is|are|will|can|does|do|should|tell|explain|compare)\b/i.test(query)
+    );
+
+    if (isQuestion) {
+        // Debounce questions (wait for user to stop typing)
+        searchDebounceTimer = setTimeout(() => answerQuestion(query), 600);
+    } else {
+        renderArticles();
+    }
+}
+
+function findRelevantArticles(question, limit) {
+    const queryWords = question.toLowerCase()
+        .replace(/[?.,!]/g, '')
+        .split(/\s+/)
+        .filter(w => w.length > 3);
+
+    return articles
+        .map(a => {
+            const text = `${a.title} ${a.description} ${(a.keywords || []).join(' ')}`.toLowerCase();
+            const matches = queryWords.filter(w => text.includes(w)).length;
+            return { ...a, relevance: matches };
+        })
+        .filter(a => a.relevance > 0)
+        .sort((a, b) => b.relevance - a.relevance)
+        .slice(0, limit);
+}
+
+async function answerQuestion(question) {
+    const relevant = findRelevantArticles(question, 8);
+
+    articleContent.innerHTML = `
+        <div class="answer-engine">
+            <div class="answer-question">${escapeHTML(question)}</div>
+            <div class="answer-loading">
+                <div class="loading-dots"><span></span><span></span><span></span></div>
+                <p>Searching across ${articles.length} articles...</p>
+            </div>
+        </div>`;
+
+    if (relevant.length === 0) {
+        articleContent.innerHTML = `
+            <div class="answer-engine">
+                <div class="answer-question">${escapeHTML(question)}</div>
+                <p class="answer-empty">No relevant articles found for this question. Try different keywords.</p>
+            </div>`;
+        return;
+    }
+
+    const context = relevant.map((a, i) =>
+        `[${i+1}] "${a.title}" (${a.source}, ${formatDate(a.date)}):\n${a.description}`
+    ).join('\n\n');
+
+    const prompt = `Based on these recent tech/AI news articles, answer the question.
+
+ARTICLES:
+${context}
+
+QUESTION: ${question}
+
+Rules:
+- Answer based ONLY on the provided articles
+- Cite sources as [1], [2] etc.
+- If the articles don't contain enough info, say so
+- Be concise (max 200 words)
+- If multiple articles discuss this, synthesize them`;
+
+    try {
+        const answer = await callLLM(prompt, { max_tokens: 600, temperature: 0.3 });
+        displayAnswer(question, answer, relevant);
+    } catch (e) {
+        articleContent.innerHTML = `
+            <div class="answer-engine">
+                <div class="answer-question">${escapeHTML(question)}</div>
+                <p class="answer-error">Failed to generate answer. <a href="#" onclick="answerQuestion('${escapeHTML(question).replace(/'/g, "\\'")}'); return false;">Retry</a></p>
+            </div>`;
+    }
+}
+
+function displayAnswer(question, answer, sources) {
+    const formatted = escapeHTML(answer)
+        .replace(/\[(\d+)\]/g, '<sup class="answer-ref">[$1]</sup>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .split('\n\n')
+        .map(p => `<p>${p}</p>`)
+        .join('');
+
+    const sourceLinks = sources.map((a, i) =>
+        `<li>
+            <a href="#" onclick="showArticle(articles.find(x=>x.id==='${a.id}'));return false">
+                [${i+1}] ${escapeHTML(a.title)}
+            </a>
+            <span class="answer-source-meta">${escapeHTML(a.source)} · ${formatDate(a.date)}</span>
+        </li>`
+    ).join('');
+
+    articleContent.innerHTML = `
+        <div class="answer-engine">
+            <div class="answer-question">${escapeHTML(question)}</div>
+            <div class="answer-text">${formatted}</div>
+            <h4 class="answer-sources-header">Sources</h4>
+            <ol class="answer-sources">${sourceLinks}</ol>
+        </div>`;
+}
+
 function filterArticles() {
     renderArticles();
 }
 
+let articleViewStart = null;
+
+function trackReadTime() {
+    if (currentArticle && articleViewStart) {
+        const duration = Math.round((performance.now() - articleViewStart) / 1000);
+        if (duration >= 5) {
+            // Save read time per article
+            const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
+            readTimes[currentArticle.id] = {
+                seconds: duration,
+                source: currentArticle.source,
+                keywords: currentArticle.keywords || [],
+                ts: Date.now()
+            };
+            localStorage.setItem('readTimes', JSON.stringify(readTimes));
+        }
+    }
+}
+
 function showArticle(article) {
+    // Track time spent on previous article
+    trackReadTime();
+    articleViewStart = performance.now();
+
     currentArticle = article;
     article.read = true;
 
@@ -1005,7 +1155,26 @@ async function scoreBatch(batch) {
         `[${i}] ${a.title} (${a.source})`
     ).join('\n');
 
-    const prompt = `You are a news relevance filter. Score these articles 1-10 for someone interested in: ${filterInterests}
+    // Build preference context from implicit feedback
+    let prefContext = '';
+    const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
+    const entries = Object.values(readTimes);
+    if (entries.length >= 5) {
+        const engaged = entries.filter(e => e.seconds >= 30);
+        const sourceCounts = {};
+        const kwCounts = {};
+        engaged.forEach(e => {
+            sourceCounts[e.source] = (sourceCounts[e.source] || 0) + 1;
+            (e.keywords || []).forEach(k => { kwCounts[k] = (kwCounts[k] || 0) + 1; });
+        });
+        const topSources = Object.entries(sourceCounts).sort((a,b) => b[1]-a[1]).slice(0,3).map(e => e[0]);
+        const topKw = Object.entries(kwCounts).sort((a,b) => b[1]-a[1]).slice(0,5).map(e => e[0]);
+        if (topSources.length > 0) {
+            prefContext = `\nUser reading patterns: prefers ${topSources.join(', ')}. Frequent topics: ${topKw.join(', ')}. Boost these slightly (max +1).`;
+        }
+    }
+
+    const prompt = `You are a news relevance filter. Score these articles 1-10 for someone interested in: ${filterInterests}${prefContext}
 
 ${articleList}
 
@@ -1340,6 +1509,19 @@ Rules:
             </svg>
             Copy as LinkedIn post`;
     }
+}
+
+// ==================== DISCOVERY HELPERS ====================
+
+function getTopReadSources(limit) {
+    const counts = {};
+    articles.filter(a => a.read).forEach(a => {
+        counts[a.source] = (counts[a.source] || 0) + 1;
+    });
+    return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([source]) => source);
 }
 
 // ==================== SIDEBAR RESIZE ====================
