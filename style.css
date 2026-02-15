@@ -1276,6 +1276,19 @@ body {
 .briefing-loading .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
 .briefing-loading .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
+.briefing-actions {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    gap: 12px;
+}
+
+.briefing-actions .btn-primary {
+    display: inline-flex;
+    align-items: center;
+}
+
 .briefing-empty,
 .briefing-error {
     text-align: center;

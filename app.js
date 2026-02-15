@@ -1252,9 +1252,93 @@ function displayBriefing(text, topArticles) {
                 weekday: 'long', month: 'long', day: 'numeric'
             })}</p>
             <div class="briefing-content">${formatted}</div>
+            <div class="briefing-actions">
+                <button class="btn-primary" onclick="generateLinkedInPost()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                        <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-4 0v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zM4 6a2 2 0 100-4 2 2 0 000 4z"/>
+                    </svg>
+                    Copy as LinkedIn post
+                </button>
+            </div>
             <h3 class="briefing-sources-header">Sources</h3>
             <ol class="briefing-sources">${articleLinks}</ol>
         </div>`;
+}
+
+// ==================== LINKEDIN POST ====================
+
+async function generateLinkedInPost() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const topArticles = articles
+        .filter(a => new Date(a.date) >= today)
+        .sort((a, b) => (articleScores[b.id] || 0) - (articleScores[a.id] || 0))
+        .slice(0, 10);
+
+    if (topArticles.length === 0) {
+        showToast('No articles from today');
+        return;
+    }
+
+    const btn = document.querySelector('.briefing-actions .btn-primary');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `
+            <div class="loading-dots" style="display:inline-flex;gap:3px;margin-right:8px;"><span></span><span></span><span></span></div>
+            Generating...`;
+    }
+
+    const articleList = topArticles.map((a, i) =>
+        `${i+1}. "${a.title}" (${a.source}) — ${a.groqSummary || a.description?.substring(0, 100) || ''}`
+    ).join('\n');
+
+    const prompt = `Write a LinkedIn post based on today's top AI/tech news. The post should position the author as someone who stays on top of the industry.
+
+Today's articles:
+${articleList}
+
+Rules:
+- Start with a strong hook line (question or bold statement) — NO emoji
+- Then a line break
+- Then 4-6 short bullet points with the key stories (use plain dash -, no emoji)
+- Then a line break
+- End with a short takeaway or reflection (1-2 sentences, personal tone)
+- Add 3-5 relevant hashtags on the last line
+- Total length: 150-250 words
+- Tone: insightful, professional, not salesy
+- Do NOT use any emoji anywhere in the post
+- Use plain text only (no markdown, no bold, no asterisks)`;
+
+    try {
+        const post = await callLLM(prompt, { max_tokens: 600, temperature: 0.7 });
+
+        try {
+            await navigator.clipboard.writeText(post);
+            showToast('LinkedIn post copied!');
+        } catch (e) {
+            const ta = document.createElement('textarea');
+            ta.value = post;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast('LinkedIn post copied!');
+        }
+    } catch (e) {
+        showToast('Failed to generate post');
+    }
+
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-4 0v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zM4 6a2 2 0 100-4 2 2 0 000 4z"/>
+            </svg>
+            Copy as LinkedIn post`;
+    }
 }
 
 // Mobile navigation
