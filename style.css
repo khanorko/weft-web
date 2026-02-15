@@ -59,10 +59,44 @@
     --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ==================== LIGHT THEME ==================== */
+[data-theme="light"] {
+    /* Clean light backgrounds */
+    --bg-deep: #f5f5f4;
+    --bg-primary: #fafaf9;
+    --bg-secondary: #ffffff;
+    --bg-elevated: #f0f0ee;
+    --bg-hover: #e8e8e5;
+
+    /* Dark text hierarchy */
+    --text-primary: #1c1c1e;
+    --text-secondary: #52525b;
+    --text-muted: #a1a1aa;
+
+    /* Accent - same warm gold */
+    --accent: #d4911e;
+    --accent-dim: rgba(212, 145, 30, 0.12);
+    --accent-glow: rgba(212, 145, 30, 0.3);
+
+    /* Semantic colors (slightly darker for light bg) */
+    --success: #059669;
+    --success-dim: rgba(5, 150, 105, 0.1);
+    --danger: #dc2626;
+    --danger-dim: rgba(220, 38, 38, 0.1);
+    --info: #2563eb;
+    --info-dim: rgba(37, 99, 235, 0.08);
+
+    /* Borders - light gray */
+    --border-subtle: rgba(0, 0, 0, 0.06);
+    --border-default: rgba(0, 0, 0, 0.1);
+    --border-strong: rgba(0, 0, 0, 0.15);
+}
+
 html {
     font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {
@@ -71,6 +105,7 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     letter-spacing: -0.01em;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Screen reader only */
@@ -1001,6 +1036,19 @@ body {
     font-size: 13px;
 }
 
+.feed-opml-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.feed-opml-row .btn-secondary {
+    padding: 8px 14px;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+}
+
 .setting-group a {
     color: var(--accent);
     text-decoration: none;
@@ -1484,6 +1532,10 @@ body {
         transform: translateX(0);
     }
 
+    .sidebar-resize-handle {
+        display: none;
+    }
+
     .content::before {
         left: 0;
     }
@@ -1517,4 +1569,47 @@ body {
         margin: var(--space-md);
         border-radius: 16px;
     }
+}
+
+/* ==================== LIGHT THEME OVERRIDES ==================== */
+
+/* Remove warm glow overlay in light mode */
+[data-theme="light"] .content::before {
+    background: none;
+    opacity: 0;
+}
+
+/* Subtle warm tint on sidebar */
+[data-theme="light"] .sidebar::before {
+    background: linear-gradient(180deg, rgba(245, 166, 35, 0.02) 0%, transparent 100%);
+}
+
+/* Score badges with better contrast on light backgrounds */
+[data-theme="light"] .score-badge--high { background: rgba(16, 185, 129, 0.15); color: #059669; }
+[data-theme="light"] .score-badge--mid { background: rgba(245, 166, 35, 0.15); color: #b45309; }
+[data-theme="light"] .score-badge--low { background: rgba(245, 158, 11, 0.15); color: #92400e; }
+[data-theme="light"] .score-badge--min { background: rgba(113, 113, 122, 0.12); color: #52525b; }
+
+/* Scrollbar for light mode */
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+/* Modal backdrop lighter in light mode */
+[data-theme="light"] .modal {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+/* Toast shadow lighter */
+[data-theme="light"] .toast {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Modal shadow lighter */
+[data-theme="light"] .modal-content {
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
 }

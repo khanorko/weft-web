@@ -31,6 +31,12 @@ export default async function handler(req, res) {
     if (!msg.role || !msg.content || typeof msg.content !== 'string') {
       return res.status(400).json({ error: 'Each message must have role and content (string)' });
     }
+    if (msg.content.length > 50000) {
+      return res.status(400).json({ error: 'Message content too long (max 50000 chars)' });
+    }
+    if (!['user', 'assistant', 'system'].includes(msg.role)) {
+      return res.status(400).json({ error: 'Invalid message role' });
+    }
   }
 
   // Build sanitized body

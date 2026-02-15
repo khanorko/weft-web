@@ -1,42 +1,51 @@
-# Weft
+# Weft — Pattern from noise
+# https://weft-web.vercel.app
 
-> AI-powered news aggregator that curates and summarizes the most relevant tech and AI articles.
+> AI-powered news aggregator that curates, scores, and summarizes tech and AI articles from 20+ RSS sources.
 
-Weft aggregates RSS feeds from 20+ sources across AI news, major tech publications, thought leaders, design/UX, and company blogs. It uses LLMs to score articles by relevance to user interests and generate summaries.
+## What is Weft?
+Weft is a free, open web application that aggregates RSS feeds from leading tech and AI publications, scores each article by relevance using AI, and generates concise summaries. It helps professionals stay informed without information overload.
 
-## Features
+## Key Features
+- Smart Filter: AI scores articles 1-10 based on user-defined interests (e.g., "AI, LLMs, machine learning")
+- AI Summaries: Auto-generated via Groq (Llama 3.3 70B) in multiple styles — newsletter, TL;DR, bullet points, executive brief, or custom prompts
+- Daily Briefing: AI-generated daily digest of top stories with key themes and patterns
+- Answer Engine: Ask natural language questions and get answers synthesized from current articles with source citations
+- Discovery Mode: Surface articles outside your usual reading patterns to counter filter bubbles
+- LinkedIn Post Generator: One-click AI-generated LinkedIn post from daily top stories
+- Custom Feeds: Add/remove RSS sources, import/export OPML
+- Implicit Feedback: Read-time tracking improves scoring over time
+- Share: Share articles with AI summary via Web Share API or clipboard
+- Light/Dark Mode: Toggle between themes, preference saved locally
+- PWA: Installable as a native-like app, works offline for cached content
 
-- Smart Filter: AI scores articles 1-10 based on user-defined interests
-- AI Summaries: Auto-generated via Groq (Llama 3.3 70B) with multiple styles (newsletter, TL;DR, bullets, executive brief)
-- Custom Styles: Users can create and save custom summary prompts
-- Feed Management: Toggle default feeds on/off, add custom RSS sources
-- AI Images: Gemini Imagen generates article illustrations when OG images are missing
-- PWA: Installable as app, works offline for cached content
-
-## Default Sources
-
+## Default RSS Sources (20+)
 ### Daily News
-- The Rundown AI, Hacker News, Last Week in AI, Import AI, The Batch
-
+The Rundown AI, Hacker News, Last Week in AI, Import AI, The Batch (DeepLearning.AI)
 ### Major Publications
-- MIT Tech Review, Ars Technica, The Verge AI, Wired AI, VentureBeat AI, TechCrunch AI
-
+MIT Technology Review, Ars Technica, The Verge AI, Wired AI, VentureBeat AI, TechCrunch AI
 ### Thought Leaders
-- Ethan Mollick (One Useful Thing), Gary Marcus, Zvi Mowshowitz, Interconnects
-
+Ethan Mollick (One Useful Thing), Gary Marcus, Zvi Mowshowitz, Interconnects
 ### Design & UX
-- Jakob Nielsen, UX Collective, Nielsen Norman Group
-
+Jakob Nielsen, UX Collective, Nielsen Norman Group
 ### Company Blogs
-- OpenAI, Hugging Face
+OpenAI, Hugging Face
 
 ## Tech Stack
-
 - Frontend: Vanilla JavaScript, CSS custom properties, responsive design
-- Backend: Vercel serverless functions (Groq proxy, CORS proxy, Gemini image)
-- AI: Groq (Llama 3.3 70B for summaries, Llama 3.1 8B for scoring), Google Gemini Imagen 4.0 for images
-- Storage: Browser localStorage
+- Backend: Vercel serverless functions (API proxies for Groq, CORS, Gemini image generation, summary caching)
+- AI Models: Groq (Llama 3.3 70B for summaries, Llama 3.1 8B for scoring), Google Gemini Imagen 4.0 for fallback article images
+- Storage: Browser localStorage (client-side, no account required)
+- Caching: Server-side in-memory summary cache (6h TTL), client-side article cache (1h)
 
-## URL
+## Creator
+Johan Salo — https://weft-web.vercel.app
 
-https://weft-web.vercel.app
+## How to Use
+1. Visit https://weft-web.vercel.app
+2. Articles load automatically from 20+ RSS feeds
+3. Use "Smart" filter to see AI-ranked articles matching your interests
+4. Click any article to read summary and preview
+5. Use "Briefing" tab for a daily AI digest
+6. Ask questions in the search bar for AI-powered answers
+7. Customize feeds and interests in Settings

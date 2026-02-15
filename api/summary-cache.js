@@ -35,6 +35,9 @@ export default async function handler(req, res) {
         if (!id || !style) {
             return res.status(400).json({ error: 'Missing id or style parameter' });
         }
+        if (id.length > 100 || style.length > 100) {
+            return res.status(400).json({ error: 'Parameter too long' });
+        }
 
         cleanExpired();
         const key = `${id}:${style}`;
@@ -52,6 +55,14 @@ export default async function handler(req, res) {
 
         if (!id || !style || !summary) {
             return res.status(400).json({ error: 'Missing id, style, or summary' });
+        }
+
+        if (typeof id !== 'string' || typeof style !== 'string' || typeof summary !== 'string') {
+            return res.status(400).json({ error: 'Parameters must be strings' });
+        }
+
+        if (id.length > 100 || style.length > 100) {
+            return res.status(400).json({ error: 'Parameter too long' });
         }
 
         if (summary.length > 5000) {

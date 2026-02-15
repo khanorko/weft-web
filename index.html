@@ -4,14 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Weft — Pattern from noise</title>
-    <meta name="description" content="AI-powered news aggregator. Curates and summarizes the most relevant tech and AI articles for you.">
-    <meta name="theme-color" content="#0a0a0b">
+    <meta name="description" content="Free AI-powered news aggregator. Scores, summarizes, and curates 20+ tech and AI RSS feeds with daily briefings, an answer engine, and smart filtering.">
+    <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://weft-web.vercel.app/">
 
     <!-- Open Graph -->
     <meta property="og:title" content="Weft — Pattern from noise">
-    <meta property="og:description" content="AI-powered news aggregator that curates and summarizes the most relevant tech and AI articles.">
+    <meta property="og:description" content="Free AI news aggregator with smart scoring, daily briefings, answer engine, and summaries from 20+ RSS sources.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://weft-web.vercel.app/">
     <meta property="og:site_name" content="Weft">
@@ -21,7 +22,7 @@
     <!-- Twitter -->
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Weft — Pattern from noise">
-    <meta name="twitter:description" content="AI-powered news aggregator that curates and summarizes the most relevant tech and AI articles.">
+    <meta name="twitter:description" content="Free AI news aggregator with smart scoring, daily briefings, answer engine, and summaries from 20+ RSS sources.">
     <meta name="twitter:image" content="https://weft-web.vercel.app/icon-512.png">
 
     <!-- Schema.org -->
@@ -31,7 +32,7 @@
         "@type": "WebApplication",
         "name": "Weft",
         "url": "https://weft-web.vercel.app",
-        "description": "AI-powered news aggregator that curates and summarizes the most relevant tech and AI articles for you.",
+        "description": "Free AI-powered news aggregator that scores, summarizes, and curates 20+ tech and AI RSS feeds with daily briefings, an answer engine, and smart filtering.",
         "applicationCategory": "NewsApplication",
         "operatingSystem": "Web",
         "browserRequirements": "Requires JavaScript",
@@ -45,15 +46,23 @@
             "name": "Johan Salo"
         },
         "featureList": [
-            "AI-powered article scoring and ranking",
-            "AI-generated summaries via Groq/Llama",
-            "20+ curated RSS feeds",
-            "Custom feed management",
-            "Bookmark and filter articles",
-            "PWA installable"
+            "AI-powered article scoring and ranking (1-10)",
+            "AI-generated summaries in multiple styles",
+            "Daily AI briefing with key themes",
+            "Answer engine for natural language questions",
+            "Discovery mode to counter filter bubbles",
+            "LinkedIn post generator from daily news",
+            "20+ curated RSS feeds with OPML import/export",
+            "Custom feed management and summary prompts",
+            "Implicit feedback loop via read-time tracking",
+            "Light and dark mode",
+            "PWA installable, works offline"
         ]
     }
     </script>
+
+    <!-- AI/LLM discoverability -->
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-readable site info">
 
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json">
@@ -78,6 +87,11 @@
                     <button id="refreshBtn" class="icon-btn" title="Refresh feeds" aria-label="Refresh feeds">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                        </svg>
+                    </button>
+                    <button id="themeToggle" class="icon-btn" title="Switch to light mode" aria-label="Toggle theme">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
                         </svg>
                     </button>
                     <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">
@@ -159,6 +173,13 @@
                         <input type="text" id="newFeedName" placeholder="Name">
                         <input type="text" id="newFeedUrl" placeholder="RSS URL">
                         <button class="btn-secondary" id="addFeedBtn">Add</button>
+                    </div>
+                    <div class="feed-opml-row">
+                        <button class="btn-secondary" onclick="exportOPML()">Export OPML</button>
+                        <label class="btn-secondary" style="cursor:pointer;">
+                            Import OPML
+                            <input type="file" id="opmlFileInput" accept=".opml,.xml" style="display:none;" onchange="importOPML(this)">
+                        </label>
                     </div>
                     <small>Toggle sources on/off or add your own RSS feeds</small>
                 </div>

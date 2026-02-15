@@ -121,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadArticles();
     setupEventListeners();
     setupSidebarResize();
+    setupThemeToggle();
 });
 
 function setupEventListeners() {
@@ -177,10 +178,10 @@ function renderFeedManager() {
         const enabled = !disabledFeeds.includes(feed.url);
         return `
             <div class="feed-item">
-                <input type="checkbox" ${enabled ? 'checked' : ''} data-url="${feed.url}" onchange="toggleFeed(this)">
-                <span class="feed-name">${feed.name}</span>
-                <span class="feed-category">${feed.category}</span>
-                ${!feed.isDefault ? `<button class="feed-remove" onclick="removeCustomFeed('${feed.url}')" title="Remove">&times;</button>` : ''}
+                <input type="checkbox" ${enabled ? 'checked' : ''} data-url="${escapeHTML(feed.url)}" onchange="toggleFeed(this)">
+                <span class="feed-name">${escapeHTML(feed.name)}</span>
+                <span class="feed-category">${escapeHTML(feed.category)}</span>
+                ${!feed.isDefault ? `<button class="feed-remove" onclick="removeCustomFeed('${escapeJSString(feed.url)}')" title="Remove">&times;</button>` : ''}
             </div>
         `;
     }).join('');
@@ -505,6 +506,31 @@ function escapeHTML(str) {
     return div.innerHTML;
 }
 
+// Escape a string for safe embedding inside a JS string literal within an HTML attribute
+function escapeJSString(str) {
+    return str
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '\\x3c')
+        .replace(/>/g, '\\x3e')
+        .replace(/`/g, '\\`')
+        .replace(/\$/g, '\\$')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+}
+
+// Sanitize URL: only allow http/https to prevent javascript: XSS
+function sanitizeURL(url) {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            return escapeHTML(url);
+        }
+    } catch (e) {}
+    return '#';
+}
+
 // Generate unique hash from string
 function hashCode(str) {
     let hash = 0;
@@ -595,15 +621,15 @@ function renderArticles() {
             <div class="article-item ${article.id === currentArticle?.id ? 'active' : ''} ${article.read ? 'read' : ''}" data-id="${article.id}">
                 <div class="article-item-header">
                     <div class="article-tags">
-                        ${article.keywords.slice(0, 2).map(k => `<span class="tag">${k}</span>`).join('')}
+                        ${article.keywords.slice(0, 2).map(k => `<span class="tag">${escapeHTML(k)}</span>`).join('')}
                     </div>
                     ${scoreBadge}
                 </div>
-                <h3>${article.title}</h3>
+                <h3>${escapeHTML(article.title)}</h3>
                 ${article.scoreReason ? `<p class="score-reason-preview">${escapeHTML(article.scoreReason)}</p>` : ''}
                 ${article.groqSummary ? `<p class="groq-summary">${escapeHTML(article.groqSummary)}</p>` : ''}
                 <div class="article-meta">
-                    <span>${article.source}</span>
+                    <span>${escapeHTML(article.source)}</span>
                     <span>${formatDate(article.date)}</span>
                     ${article.bookmarked ? '<span style="color: var(--accent);">★</span>' : ''}
                 </div>
@@ -697,7 +723,7 @@ Rules:
         articleContent.innerHTML = `
             <div class="answer-engine">
                 <div class="answer-question">${escapeHTML(question)}</div>
-                <p class="answer-error">Failed to generate answer. <a href="#" onclick="answerQuestion('${escapeHTML(question).replace(/'/g, "\\'")}'); return false;">Retry</a></p>
+                <p class="answer-error">Failed to generate answer. <a href="#" onclick="answerQuestion('${escapeJSString(question)}'); return false;">Retry</a></p>
             </div>`;
     }
 }
@@ -776,15 +802,15 @@ function showArticle(article) {
             <div id="articleImage"></div>
 
             <div class="tags">
-                ${article.keywords.map(k => `<span class="tag">${k}</span>`).join('')}
+                ${article.keywords.map(k => `<span class="tag">${escapeHTML(k)}</span>`).join('')}
                 ${score !== undefined ? `<span class="tag tag--score ${getScoreBadgeClass(score)}">⚡ ${score}/10</span>` : ''}
             </div>
             ${article.scoreReason ? `<p class="score-reason-detail">${escapeHTML(article.scoreReason)}</p>` : ''}
 
-            <h1>${article.title}</h1>
+            <h1>${escapeHTML(article.title)}</h1>
 
             <div class="meta">
-                <span>${article.source}</span>
+                <span>${escapeHTML(article.source)}</span>
                 <span>${formatDate(article.date)}</span>
             </div>
 
@@ -810,7 +836,7 @@ function showArticle(article) {
                     </svg>
                 </button>
                 <div style="flex:1"></div>
-                <a href="${article.link}" target="_blank" class="btn-primary">Read Original</a>
+                <a href="${sanitizeURL(article.link)}" target="_blank" rel="noopener noreferrer" class="btn-primary">Read Original</a>
             </div>
 
             <div class="summary-section">
@@ -823,7 +849,7 @@ function showArticle(article) {
                 <div id="summaryContent">
                     ${article.summary ? `
                         ${formatSummary(article.summary)}
-                        <button class="btn-secondary copy-btn" onclick="copyToClipboard(\`${article.summary.replace(/`/g, '\\`').replace(/\n/g, '\\n')}\`)" style="margin-top: 12px;">
+                        <button class="btn-secondary copy-btn" onclick="copySummary()" style="margin-top: 12px;">
                             Copy Summary
                         </button>
                     ` : `
@@ -840,7 +866,7 @@ function showArticle(article) {
 
             <div class="article-body">
                 <h4>Article Preview</h4>
-                <p>${article.description || 'No preview available. Click "Read Original" to view the full article.'}</p>
+                <p>${escapeHTML(article.description || 'No preview available. Click "Read Original" to view the full article.')}</p>
             </div>
         </div>
     `;
@@ -1022,7 +1048,7 @@ async function generateSummary(id) {
         summaryContent.innerHTML = formatSummary(summary);
     } catch (error) {
         summaryContent.innerHTML = `
-            <p style="color: var(--danger); margin-bottom: 16px;">Error: ${error.message}</p>
+            <p style="color: var(--danger); margin-bottom: 16px;">Error: ${escapeHTML(error.message)}</p>
             <button class="btn-primary generate-btn" onclick="generateSummary('${article.id}')">Try Again</button>
         `;
     }
@@ -1254,6 +1280,13 @@ function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => {
         showToast('Copied to clipboard');
     });
+}
+
+// Copy current article summary (avoids embedding summary text in onclick attributes)
+function copySummary() {
+    if (currentArticle && currentArticle.summary) {
+        copyToClipboard(currentArticle.summary);
+    }
 }
 
 // Toast notification
@@ -1567,6 +1600,73 @@ function setupSidebarResize() {
     });
 }
 
+// ==================== OPML IMPORT/EXPORT ====================
+
+function exportOPML() {
+    const allFeeds = [...DEFAULT_FEEDS, ...customFeeds];
+    const escXml = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const opml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+<head><title>Weft Feeds</title><dateCreated>${new Date().toUTCString()}</dateCreated></head>
+<body>
+${allFeeds.map(f => `  <outline text="${escXml(f.name)}" title="${escXml(f.name)}" xmlUrl="${escXml(f.url)}" type="rss" category="${escXml(f.category)}" />`).join('\n')}
+</body>
+</opml>`;
+
+    const blob = new Blob([opml], { type: 'text/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'weft-feeds.opml';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('OPML exported');
+}
+
+function importOPML(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(e.target.result, 'text/xml');
+            const outlines = doc.querySelectorAll('outline[xmlUrl]');
+
+            const existingUrls = new Set([...DEFAULT_FEEDS, ...customFeeds].map(f => f.url));
+            let added = 0;
+
+            outlines.forEach(el => {
+                const url = el.getAttribute('xmlUrl');
+                const name = el.getAttribute('title') || el.getAttribute('text') || 'Unknown';
+
+                if (url && !existingUrls.has(url)) {
+                    customFeeds.push({ name, url, category: 'imported' });
+                    existingUrls.add(url);
+                    added++;
+                }
+            });
+
+            if (added > 0) {
+                localStorage.setItem('customFeeds', JSON.stringify(customFeeds));
+                renderFeedManager();
+                showToast(`Imported ${added} feed${added > 1 ? 's' : ''}`);
+            } else {
+                showToast('No new feeds found in OPML');
+            }
+        } catch (err) {
+            showToast('Invalid OPML file');
+            console.error('OPML import error:', err);
+        }
+
+        // Reset input so same file can be re-imported
+        input.value = '';
+    };
+    reader.readAsText(file);
+}
+
 // Mobile navigation
 function showMobileContent() {
     if (isMobile) {
@@ -1576,4 +1676,35 @@ function showMobileContent() {
 
 function hideMobileContent() {
     articleContent.classList.remove('mobile-visible');
+}
+
+// ==================== THEME TOGGLE ====================
+
+function setupThemeToggle() {
+    const toggle = document.getElementById('themeToggle');
+    if (!toggle) return;
+
+    const saved = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+    updateThemeIcon(saved);
+
+    toggle.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme') || 'dark';
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        updateThemeIcon(next);
+    });
+}
+
+function updateThemeIcon(theme) {
+    const toggle = document.getElementById('themeToggle');
+    if (!toggle) return;
+    if (theme === 'light') {
+        toggle.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>';
+        toggle.title = 'Switch to dark mode';
+    } else {
+        toggle.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
+        toggle.title = 'Switch to light mode';
+    }
 }

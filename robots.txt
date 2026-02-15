@@ -34,3 +34,6 @@ User-agent: meta-externalagent
 Allow: /
 
 Sitemap: https://weft-web.vercel.app/sitemap.xml
+
+# LLM-readable documentation
+# https://weft-web.vercel.app/llms.txt

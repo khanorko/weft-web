@@ -9,11 +9,18 @@ export default async function handler(req, res) {
   }
 
   const { title, keywords } = req.body;
-  if (!title) {
+  if (!title || typeof title !== 'string') {
     return res.status(400).json({ error: 'Title is required' });
   }
 
-  const prompt = `Create an abstract, editorial illustration for a tech news article titled: "${title}". Keywords: ${(keywords || []).join(', ')}. Style: minimal, dark background, geometric shapes, warm gold accent color (#f5a623). No text in the image.`;
+  // Sanitize inputs: truncate to prevent prompt injection via excessively long inputs
+  const safeTitle = title.slice(0, 200).replace(/["\n\r]/g, ' ');
+  const safeKeywords = (Array.isArray(keywords) ? keywords : [])
+    .slice(0, 5)
+    .map(k => typeof k === 'string' ? k.slice(0, 30).replace(/["\n\r]/g, ' ') : '')
+    .filter(Boolean);
+
+  const prompt = `Create an abstract, editorial illustration for a tech news article titled: "${safeTitle}". Keywords: ${safeKeywords.join(', ')}. Style: minimal, dark background, geometric shapes, warm gold accent color (#f5a623). No text in the image.`;
 
   try {
     const response = await fetch(

@@ -1,50 +1,102 @@
+const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB max response
+const MAX_REDIRECTS = 5;
+
+function isPrivateHostname(hostname) {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname === '[::1]' ||
+    hostname === '::1' ||
+    hostname.startsWith('10.') ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('169.254.') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.local')
+  );
+}
+
+function validateUrl(urlStr) {
+  let parsed;
+  try {
+    parsed = new URL(urlStr);
+  } catch {
+    return null;
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return null;
+  }
+
+  if (isPrivateHostname(parsed.hostname)) {
+    return null;
+  }
+
+  return parsed;
+}
+
 export default async function handler(req, res) {
   const url = req.query.url;
   if (!url) {
     return res.status(400).json({ error: 'Missing url parameter' });
   }
 
-  // Validate URL: only allow HTTPS, block internal/private ranges
-  let parsed;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return res.status(400).json({ error: 'Invalid URL' });
-  }
-
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    return res.status(400).json({ error: 'Only HTTP(S) URLs allowed' });
-  }
-
-  const hostname = parsed.hostname;
-  if (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '0.0.0.0' ||
-    hostname.startsWith('10.') ||
-    hostname.startsWith('172.') ||
-    hostname.startsWith('192.168.') ||
-    hostname.endsWith('.internal') ||
-    hostname === '169.254.169.254' // cloud metadata endpoint
-  ) {
-    return res.status(403).json({ error: 'Internal URLs not allowed' });
+  const parsed = validateUrl(url);
+  if (!parsed) {
+    return res.status(400).json({ error: 'Invalid or disallowed URL' });
   }
 
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Weft/1.0 RSS Reader',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-      },
-      signal: controller.signal,
-      redirect: 'follow',
-    });
+    // Follow redirects manually to validate each target
+    let currentUrl = url;
+    let response;
+    for (let i = 0; i <= MAX_REDIRECTS; i++) {
+      response = await fetch(currentUrl, {
+        headers: {
+          'User-Agent': 'Weft/1.0 RSS Reader',
+          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        },
+        signal: controller.signal,
+        redirect: 'manual',
+      });
+
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (!location) break;
+
+        // Resolve relative redirects
+        const redirectUrl = new URL(location, currentUrl).toString();
+        const validatedRedirect = validateUrl(redirectUrl);
+        if (!validatedRedirect) {
+          clearTimeout(timeout);
+          return res.status(403).json({ error: 'Redirect to disallowed URL blocked' });
+        }
+        currentUrl = redirectUrl;
+        if (i === MAX_REDIRECTS) {
+          clearTimeout(timeout);
+          return res.status(400).json({ error: 'Too many redirects' });
+        }
+        continue;
+      }
+      break;
+    }
 
     clearTimeout(timeout);
+
+    // Check Content-Length if available
+    const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+    if (contentLength > MAX_RESPONSE_SIZE) {
+      return res.status(413).json({ error: 'Response too large' });
+    }
+
     const text = await response.text();
+    if (text.length > MAX_RESPONSE_SIZE) {
+      return res.status(413).json({ error: 'Response too large' });
+    }
 
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', response.headers.get('content-type') || 'text/xml');
