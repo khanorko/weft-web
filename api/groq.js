@@ -3,7 +3,7 @@ const ALLOWED_MODELS = [
   'llama-3.1-8b-instant',
 ];
 
-const MAX_TOKENS_LIMIT = 2000;
+const MAX_TOKENS_LIMIT = 4000;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

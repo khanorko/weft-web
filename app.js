@@ -516,6 +516,11 @@ function renderArticles() {
     const filter = document.querySelector('.filter-btn.active')?.dataset.filter || 'smart';
     const search = searchInput.value.toLowerCase();
 
+    if (filter === 'briefing') {
+        renderBriefing();
+        return;
+    }
+
     let filtered = articles;
 
     if (filter === 'smart') {
@@ -581,6 +586,7 @@ function renderArticles() {
                     ${scoreBadge}
                 </div>
                 <h3>${article.title}</h3>
+                ${article.scoreReason ? `<p class="score-reason-preview">${escapeHTML(article.scoreReason)}</p>` : ''}
                 ${article.groqSummary ? `<p class="groq-summary">${escapeHTML(article.groqSummary)}</p>` : ''}
                 <div class="article-meta">
                     <span>${article.source}</span>
@@ -622,6 +628,7 @@ function showArticle(article) {
                 ${article.keywords.map(k => `<span class="tag">${k}</span>`).join('')}
                 ${score !== undefined ? `<span class="tag tag--score ${getScoreBadgeClass(score)}">⚡ ${score}/10</span>` : ''}
             </div>
+            ${article.scoreReason ? `<p class="score-reason-detail">${escapeHTML(article.scoreReason)}</p>` : ''}
 
             <h1>${article.title}</h1>
 
@@ -644,6 +651,11 @@ function showArticle(article) {
                 <button class="action-btn ${article.bookmarked ? 'bookmarked' : ''}" onclick="toggleBookmark('${article.id}')" title="Bookmark">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="${article.bookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
                         <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
+                    </svg>
+                </button>
+                <button class="action-btn" onclick="shareArticle(currentArticle)" title="Share">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/>
                     </svg>
                 </button>
                 <div style="flex:1"></div>
@@ -817,6 +829,8 @@ async function generateSummary(id) {
     }
 
     const summaryContent = document.getElementById('summaryContent');
+    if (!summaryContent) return;
+
     summaryContent.innerHTML = `
         <div class="loading-state">
             <div class="loading-dots"><span></span><span></span><span></span></div>
@@ -824,13 +838,35 @@ async function generateSummary(id) {
         </div>
     `;
 
+    const style = settings.summaryStyle || 'newsletter';
+
+    // 1. Check server-side cache first
+    try {
+        const cacheRes = await fetch(`/api/summary-cache?id=${encodeURIComponent(id)}&style=${encodeURIComponent(style)}`);
+        const cacheData = await cacheRes.json();
+        if (cacheData.cached && cacheData.summary) {
+            article.summary = cacheData.summary;
+            localStorage.setItem('articles', JSON.stringify(articles));
+            summaryContent.innerHTML = formatSummary(article.summary);
+            return;
+        }
+    } catch (e) { /* cache miss, continue */ }
+
+    // 2. Generate via LLM
     try {
         const prompt = getCurrentPrompt(article);
         const summary = await callLLM(prompt);
         article.summary = summary;
 
-        // Save to cache
+        // Save to localStorage
         localStorage.setItem('articles', JSON.stringify(articles));
+
+        // 3. Save to server cache (fire-and-forget)
+        fetch('/api/summary-cache', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, style, summary })
+        }).catch(() => {});
 
         summaryContent.innerHTML = formatSummary(summary);
     } catch (error) {
@@ -841,14 +877,19 @@ async function generateSummary(id) {
     }
 }
 
-async function callLLM(prompt) {
+async function callLLM(prompt, options = {}) {
+    const maxTokens = options.max_tokens || 400;
+    const temperature = options.temperature;
+
     // Use proxy (shared key) unless user has their own key
     if (!settings.useOwnKey || !settings.apiKey) {
-        return callGroqProxy({
-            model: 'llama-3.3-70b-versatile',
-            max_tokens: 400,
+        const body = {
+            model: options.model || 'llama-3.3-70b-versatile',
+            max_tokens: maxTokens,
             messages: [{ role: 'user', content: prompt }]
-        });
+        };
+        if (temperature !== undefined) body.temperature = temperature;
+        return callGroqProxy(body);
     }
 
     const configs = {
@@ -873,16 +914,18 @@ async function callLLM(prompt) {
     };
 
     const config = configs[settings.provider];
+    const requestBody = {
+        model: config.model,
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: prompt }]
+    };
+    if (temperature !== undefined) requestBody.temperature = temperature;
 
     if (settings.provider === 'anthropic') {
         const response = await fetch(config.url, {
             method: 'POST',
             headers: { ...config.headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: config.model,
-                max_tokens: 400,
-                messages: [{ role: 'user', content: prompt }]
-            })
+            body: JSON.stringify(requestBody)
         });
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
@@ -891,11 +934,7 @@ async function callLLM(prompt) {
         const response = await fetch(config.url, {
             method: 'POST',
             headers: { ...config.headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: config.model,
-                max_tokens: 400,
-                messages: [{ role: 'user', content: prompt }]
-            })
+            body: JSON.stringify(requestBody)
         });
         const data = await response.json();
         if (data.error) throw new Error(data.error.message || data.error);
@@ -936,53 +975,67 @@ function formatDate(dateStr) {
 // ==================== SMART FILTER ====================
 
 async function runSmartFilter() {
-    // Get unscored articles
-    const unscored = articles.filter(a => articleScores[a.id] === undefined).slice(0, 20);
+    const unscored = articles.filter(a => articleScores[a.id] === undefined);
     if (unscored.length === 0) return;
 
-    console.log(`🔍 Smart filtering ${unscored.length} articles...`);
-
-    const articleListText = unscored.map((a, i) => `[${i}] ${a.title}\n${a.description?.slice(0, 150) || ''}`).join('\n\n');
-
-    const prompt = `You are a news relevance filter. Analyze these articles for someone interested in: ${settings.filterInterests}
-
-For each article, return:
-- score: 1-10 (10 = must read, 1 = irrelevant/spam)
-- summary: One sentence TL;DR
-
-ARTICLES:
-${articleListText}
-
-Respond with ONLY valid JSON in this exact format:
-{"articles": [{"index": 0, "score": 7, "summary": "..."}, ...]}`;
-
-    try {
-        const text = await callGroqProxy({
-            model: 'llama-3.1-8b-instant',
-            max_tokens: 2000,
-            temperature: 0.3,
-            messages: [{ role: 'user', content: prompt }]
-        });
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error('No JSON in response');
-        
-        const result = JSON.parse(jsonMatch[0]);
-        
-        result.articles.forEach(r => {
-            if (r.index < unscored.length) {
-                const article = unscored[r.index];
-                articleScores[article.id] = r.score;
-                article.groqSummary = r.summary;
-            }
-        });
-        
-        localStorage.setItem('articleScores', JSON.stringify(articleScores));
-        localStorage.setItem('articles', JSON.stringify(articles));
-        console.log(`✅ Smart filtered ${result.articles.length} articles`);
-        renderArticles();
-    } catch (error) {
-        console.error('Smart filter error:', error);
+    const BATCH_SIZE = 40;
+    const batches = [];
+    for (let i = 0; i < unscored.length; i += BATCH_SIZE) {
+        batches.push(unscored.slice(i, i + BATCH_SIZE));
     }
+
+    console.log(`🔍 Smart filtering ${unscored.length} articles in ${batches.length} batch(es)...`);
+
+    for (const batch of batches) {
+        try {
+            await scoreBatch(batch);
+            renderArticles();
+        } catch (e) {
+            console.error('Batch scoring failed:', e);
+            break;
+        }
+    }
+}
+
+async function scoreBatch(batch) {
+    const filterInterests = settings.filterInterests || 'AI, machine learning, LLMs, generative AI, tech industry';
+
+    const articleList = batch.map((a, i) =>
+        `[${i}] ${a.title} (${a.source})`
+    ).join('\n');
+
+    const prompt = `You are a news relevance filter. Score these articles 1-10 for someone interested in: ${filterInterests}
+
+${articleList}
+
+Return JSON: {"articles":[{"i":0,"s":7,"r":"reason for score","t":"one sentence summary"},...]}"
+- i: index, s: score (1=irrelevant, 10=must read), r: one-sentence reason for the score, t: one-sentence TL;DR
+Respond with ONLY valid JSON.`;
+
+    const text = await callGroqProxy({
+        model: 'llama-3.1-8b-instant',
+        max_tokens: 3000,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: prompt }]
+    });
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in response');
+
+    const result = JSON.parse(jsonMatch[0]);
+
+    result.articles.forEach(scored => {
+        const article = batch[scored.i];
+        if (article) {
+            articleScores[article.id] = scored.s;
+            article.groqSummary = scored.t;
+            article.scoreReason = scored.r;
+        }
+    });
+
+    localStorage.setItem('articleScores', JSON.stringify(articleScores));
+    localStorage.setItem('articles', JSON.stringify(articles));
+    console.log(`✅ Scored ${result.articles.length} articles`);
 }
 
 // Fetch Open Graph image
@@ -1049,6 +1102,159 @@ function getScoreBadgeClass(score) {
     if (score >= 6) return 'score-badge--mid';
     if (score >= 4) return 'score-badge--low';
     return 'score-badge--min';
+}
+
+// ==================== SHARE ====================
+
+async function shareArticle(article) {
+    if (!article) return;
+    const summary = article.summary || article.groqSummary || '';
+    const score = articleScores[article.id];
+
+    const text = [
+        article.title,
+        '',
+        summary ? `AI Summary:\n${summary}` : '',
+        score ? `Relevance: ${score}/10` : '',
+        '',
+        article.link,
+        '',
+        'Shared via Weft (weft-web.vercel.app)'
+    ].filter(Boolean).join('\n');
+
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: article.title, text: text, url: article.link });
+            return;
+        } catch (e) {
+            if (e.name === 'AbortError') return;
+        }
+    }
+
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast('Copied to clipboard');
+    } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Copied to clipboard');
+    }
+}
+
+// ==================== DAILY BRIEFING ====================
+
+async function renderBriefing() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const todayArticles = articles
+        .filter(a => new Date(a.date) >= today)
+        .sort((a, b) => (articleScores[b.id] || 0) - (articleScores[a.id] || 0));
+
+    const topArticles = todayArticles.slice(0, 10);
+
+    if (topArticles.length === 0) {
+        articleContent.innerHTML = `
+            <div class="briefing">
+                <h2>Daily Briefing</h2>
+                <p class="briefing-empty">No articles from today yet. Check back later.</p>
+            </div>`;
+        return;
+    }
+
+    const cacheKey = `briefing_${today.toISOString().split('T')[0]}`;
+    const cached = localStorage.getItem(cacheKey);
+
+    if (cached) {
+        displayBriefing(cached, topArticles);
+        return;
+    }
+
+    articleContent.innerHTML = `
+        <div class="briefing">
+            <h2>Daily Briefing</h2>
+            <p class="briefing-date">${today.toLocaleDateString('en-US', {
+                weekday: 'long', month: 'long', day: 'numeric'
+            })}</p>
+            <div class="briefing-loading">
+                <div class="loading-dots"><span></span><span></span><span></span></div>
+                <p>Analyzing today's top stories...</p>
+            </div>
+        </div>`;
+
+    const articleList = topArticles.map((a, i) => {
+        const score = articleScores[a.id] || '?';
+        return `[${i+1}] "${a.title}" (${a.source}, score: ${score}/10)\n    ${a.description?.substring(0, 150) || ''}`;
+    }).join('\n\n');
+
+    const prompt = `You are a senior tech news analyst writing a daily briefing.
+
+Today's top ${topArticles.length} articles (scored by AI relevance):
+
+${articleList}
+
+Write a concise daily briefing with:
+1. **HEADLINE** — The single most important story in one sentence
+2. **KEY STORIES** — 3-5 bullet points covering the most significant developments
+3. **PATTERN** — One sentence on what theme or trend connects today's news
+4. **WORTH WATCHING** — One emerging story that might become bigger
+
+Keep it under 300 words. Be specific, cite article titles. No filler.`;
+
+    try {
+        const briefing = await callLLM(prompt, { max_tokens: 800, temperature: 0.5 });
+        localStorage.setItem(cacheKey, briefing);
+        displayBriefing(briefing, topArticles);
+    } catch (e) {
+        articleContent.innerHTML = `
+            <div class="briefing">
+                <h2>Daily Briefing</h2>
+                <p class="briefing-error">Failed to generate briefing. <a href="#" onclick="renderBriefing(); return false;">Retry</a></p>
+            </div>`;
+    }
+}
+
+function displayBriefing(text, topArticles) {
+    const today = new Date();
+
+    const formatted = escapeHTML(text)
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^## (.*)$/gm, '<h3>$1</h3>')
+        .replace(/^- (.*)$/gm, '<li>$1</li>')
+        .split('\n\n')
+        .map(p => {
+            if (p.includes('<li>')) return `<ul>${p}</ul>`;
+            if (p.startsWith('<h3>')) return p;
+            return `<p>${p}</p>`;
+        })
+        .join('');
+
+    const articleLinks = topArticles.map(a => {
+        const score = articleScores[a.id] || '?';
+        return `<li>
+            <a href="#" onclick="showArticle(articles.find(x=>x.id==='${a.id}'));return false">
+                ${escapeHTML(a.title)}
+            </a>
+            <span class="briefing-source">${escapeHTML(a.source)} · ${score}/10</span>
+        </li>`;
+    }).join('');
+
+    articleContent.innerHTML = `
+        <div class="briefing">
+            <h2>Daily Briefing</h2>
+            <p class="briefing-date">${today.toLocaleDateString('en-US', {
+                weekday: 'long', month: 'long', day: 'numeric'
+            })}</p>
+            <div class="briefing-content">${formatted}</div>
+            <h3 class="briefing-sources-header">Sources</h3>
+            <ol class="briefing-sources">${articleLinks}</ol>
+        </div>`;
 }
 
 // Mobile navigation

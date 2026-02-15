@@ -1067,6 +1067,28 @@ body {
     opacity: 1;
 }
 
+/* ==================== SCORE REASON (v1.1) ==================== */
+.score-reason-preview {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 2px;
+    margin-bottom: 2px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.score-reason-detail {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: var(--space-lg);
+    line-height: 1.5;
+}
+
 /* ==================== GROQ SUMMARY (sidebar) ==================== */
 .article-item .groq-summary {
     color: var(--text-muted);
@@ -1124,6 +1146,147 @@ body {
 @keyframes toastOut {
     from { opacity: 1; transform: translateY(0) scale(1); }
     to { opacity: 0; transform: translateY(-8px) scale(0.96); }
+}
+
+/* ==================== DAILY BRIEFING (v1.1) ==================== */
+.briefing {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    animation: fadeInUp 0.4s var(--ease-out);
+}
+
+.briefing h2 {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 400;
+    margin-bottom: 4px;
+}
+
+.briefing-date {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 32px;
+}
+
+.briefing-content {
+    font-size: 1rem;
+    line-height: 1.75;
+    color: var(--text-primary);
+}
+
+.briefing-content h3,
+.briefing-content strong {
+    color: var(--accent);
+}
+
+.briefing-content h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 28px;
+    margin-bottom: 12px;
+}
+
+.briefing-content ul {
+    padding-left: 20px;
+    margin: 12px 0;
+    list-style: none;
+}
+
+.briefing-content ul li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+    position: relative;
+    padding-left: 16px;
+}
+
+.briefing-content ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+.briefing-content p {
+    margin-bottom: 16px;
+}
+
+.briefing-sources-header {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 32px;
+    margin-bottom: 12px;
+}
+
+.briefing-sources {
+    padding-left: 20px;
+    margin-top: 12px;
+}
+
+.briefing-sources li {
+    margin-bottom: 10px;
+}
+
+.briefing-sources a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.briefing-sources a:hover {
+    text-decoration: underline;
+}
+
+.briefing-source {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.briefing-loading {
+    text-align: center;
+    padding: 60px 0;
+    color: var(--text-muted);
+}
+
+.briefing-loading .loading-dots {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+.briefing-loading .loading-dots span {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 1.4s ease-in-out infinite;
+}
+
+.briefing-loading .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.briefing-loading .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+.briefing-empty,
+.briefing-error {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 60px 0;
+    font-size: 14px;
+}
+
+.briefing-error a {
+    color: var(--accent);
+    text-decoration: none;
 }
 
 /* ==================== MOBILE NAVIGATION ==================== */
