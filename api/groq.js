@@ -6,6 +6,10 @@ const ALLOWED_MODELS = [
 const MAX_TOKENS_LIMIT = 4000;
 
 export default async function handler(req, res) {
+  // Security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'no-store');
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

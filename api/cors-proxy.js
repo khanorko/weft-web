@@ -1,5 +1,6 @@
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB max response
 const MAX_REDIRECTS = 5;
+const ALLOWED_ORIGINS = ['https://weft-web.vercel.app'];
 
 function isPrivateHostname(hostname) {
   return (
@@ -37,6 +38,13 @@ function validateUrl(urlStr) {
 }
 
 export default async function handler(req, res) {
+  // Restrict to same-origin or allowed origins (allow localhost for dev)
+  const origin = req.headers.origin || req.headers.referer || '';
+  const isAllowed = !origin || ALLOWED_ORIGINS.some(o => origin.startsWith(o)) || origin.startsWith('http://localhost');
+  if (!isAllowed) {
+    return res.status(403).json({ error: 'Origin not allowed' });
+  }
+
   const url = req.query.url;
   if (!url) {
     return res.status(400).json({ error: 'Missing url parameter' });
@@ -98,7 +106,9 @@ export default async function handler(req, res) {
       return res.status(413).json({ error: 'Response too large' });
     }
 
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    const allowedOrigin = origin && origin.startsWith('http://localhost') ? origin : 'https://weft-web.vercel.app';
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Vary', 'Origin');
     res.setHeader('Content-Type', response.headers.get('content-type') || 'text/xml');
     return res.status(200).send(text);
   } catch (error) {

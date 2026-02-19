@@ -1,6 +1,19 @@
 // Weft — Pattern from noise (Web Version)
 // Credits: Kristoffer Åström (idea), Johan Salo (implementation)
 
+// Safe JSON parse from localStorage (prevents crash on corrupted data)
+function safeParse(key, fallback) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (raw === null) return fallback;
+        return JSON.parse(raw);
+    } catch (e) {
+        console.warn(`Corrupt localStorage key "${key}", resetting.`, e);
+        localStorage.removeItem(key);
+        return fallback;
+    }
+}
+
 const DEFAULT_FEEDS = [
     // Tier 1: Daily News
     { name: 'The Rundown AI', url: 'https://rss.beehiiv.com/feeds/2R3C6Bt5wj.xml', category: 'daily' },
@@ -34,8 +47,8 @@ const DEFAULT_FEEDS = [
 ];
 
 // Feed management: merge defaults with user customizations
-let disabledFeeds = JSON.parse(localStorage.getItem('disabledFeeds') || '[]');
-let customFeeds = JSON.parse(localStorage.getItem('customFeeds') || '[]');
+let disabledFeeds = safeParse('disabledFeeds', []);
+let customFeeds = safeParse('customFeeds', []);
 
 function getActiveFeeds() {
     const all = [...DEFAULT_FEEDS, ...customFeeds];
@@ -85,7 +98,7 @@ let articles = [];
 let currentArticle = null;
 let isMobile = window.innerWidth <= 900;
 window.addEventListener('resize', () => { isMobile = window.innerWidth <= 900; });
-let customStyles = JSON.parse(localStorage.getItem('customStyles') || '{}');
+let customStyles = safeParse('customStyles', {});
 let settings = {
     provider: localStorage.getItem('llmProvider') || 'groq',
     apiKey: localStorage.getItem('apiKey') || '',
@@ -96,7 +109,22 @@ let settings = {
 };
 
 // Smart filter scores cache
-let articleScores = JSON.parse(localStorage.getItem('articleScores') || '{}');
+let articleScores = safeParse('articleScores', {});
+
+// Debounced localStorage save for articles (avoids excessive serialization)
+let articleSaveTimer = null;
+function saveArticlesDebounced() {
+    clearTimeout(articleSaveTimer);
+    articleSaveTimer = setTimeout(() => {
+        localStorage.setItem('articles', JSON.stringify(articles));
+    }, 300);
+}
+
+// Immediate save for critical changes (cache after fresh load)
+function saveArticlesNow() {
+    clearTimeout(articleSaveTimer);
+    localStorage.setItem('articles', JSON.stringify(articles));
+}
 
 // DOM Elements
 const articleList = document.getElementById('articleList');
@@ -122,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setupSidebarResize();
     setupThemeToggle();
+    setupKeyboardShortcuts();
 });
 
 function setupEventListeners() {
@@ -161,6 +190,18 @@ function setupEventListeners() {
         if (item) {
             const article = articles.find(a => a.id === item.dataset.id);
             if (article) showArticle(article);
+        }
+    });
+
+    // Keyboard support for article list (Enter/Space to select)
+    articleList.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            const item = e.target.closest('.article-item');
+            if (item) {
+                e.preventDefault();
+                const article = articles.find(a => a.id === item.dataset.id);
+                if (article) showArticle(article);
+            }
         }
     });
 
@@ -267,13 +308,13 @@ function onStyleChange() {
 function saveAsNewStyle() {
     const name = customStyleNameInput.value.trim();
     if (!name) {
-        alert('Please enter a name for your custom style');
+        showToast('Please enter a name for your custom style');
         return;
     }
 
     const prompt = promptTemplate.value.trim();
     if (!prompt) {
-        alert('Please enter a prompt template');
+        showToast('Please enter a prompt template');
         return;
     }
 
@@ -291,7 +332,7 @@ function saveAsNewStyle() {
     // Clear input
     customStyleNameInput.value = '';
 
-    alert(`Style "${name}" saved!`);
+    showToast(`Style "${name}" saved`);
 }
 
 function deleteCustomStyle() {
@@ -299,16 +340,21 @@ function deleteCustomStyle() {
     if (!style.startsWith('custom_')) return;
 
     const name = style.replace('custom_', '');
-    if (!confirm(`Delete custom style "${name}"?`)) return;
 
-    delete customStyles[name];
-    localStorage.setItem('customStyles', JSON.stringify(customStyles));
+    // Use a simple inline confirm via the settings modal
+    showConfirmDialog(`Delete custom style "${name}"?`, () => {
+        delete customStyles[name];
+        localStorage.setItem('customStyles', JSON.stringify(customStyles));
 
-    // Reload dropdown and select default
-    loadCustomStyles();
-    summaryStyleSelect.value = 'newsletter';
-    onStyleChange();
+        // Reload dropdown and select default
+        loadCustomStyles();
+        summaryStyleSelect.value = 'newsletter';
+        onStyleChange();
+        showToast(`Style "${name}" deleted`);
+    });
 }
+
+let settingsListenersAttached = false;
 
 function loadSettings() {
     document.getElementById('llmProvider').value = settings.provider;
@@ -322,14 +368,19 @@ function loadSettings() {
     const ownKeyGroup = document.getElementById('ownKeyGroup');
     useOwnKeyCheckbox.checked = settings.useOwnKey;
     ownKeyGroup.style.display = settings.useOwnKey ? '' : 'none';
-    useOwnKeyCheckbox.addEventListener('change', () => {
-        ownKeyGroup.style.display = useOwnKeyCheckbox.checked ? '' : 'none';
-    });
 
-    // Setup threshold slider
-    document.getElementById('filterThreshold').addEventListener('input', (e) => {
-        document.getElementById('thresholdValue').textContent = `${e.target.value}/10`;
-    });
+    // Only attach these listeners once
+    if (!settingsListenersAttached) {
+        useOwnKeyCheckbox.addEventListener('change', () => {
+            ownKeyGroup.style.display = useOwnKeyCheckbox.checked ? '' : 'none';
+        });
+
+        document.getElementById('filterThreshold').addEventListener('input', (e) => {
+            document.getElementById('thresholdValue').textContent = `${e.target.value}/10`;
+        });
+
+        settingsListenersAttached = true;
+    }
 }
 
 function saveSettings() {
@@ -378,7 +429,7 @@ async function loadArticles(forceRefresh = false) {
     const oneHour = 60 * 60 * 1000;
 
     if (!forceRefresh && cached && cacheTime && (Date.now() - parseInt(cacheTime)) < oneHour) {
-        articles = JSON.parse(cached);
+        articles = safeParse('articles', []);
         renderArticles();
         refreshBtn.classList.remove('loading');
         
@@ -420,9 +471,21 @@ async function loadArticles(forceRefresh = false) {
 
 async function fetchFeed(feed) {
     const response = await fetch(CORS_PROXY + encodeURIComponent(feed.url));
+    if (!response.ok) {
+        console.warn(`Feed ${feed.name}: HTTP ${response.status}`);
+        return [];
+    }
+
     const text = await response.text();
     const parser = new DOMParser();
     const xml = parser.parseFromString(text, 'text/xml');
+
+    // Check for XML parse errors
+    const parseError = xml.querySelector('parsererror');
+    if (parseError) {
+        console.warn(`Feed ${feed.name}: XML parse error`);
+        return [];
+    }
 
     // Check for RSS items or Atom entries
     let items = xml.querySelectorAll('item');
@@ -432,7 +495,7 @@ async function fetchFeed(feed) {
         items = xml.querySelectorAll('entry');
     }
 
-    const articles = [];
+    const feedArticles = [];
 
     items.forEach((item, index) => {
         if (index >= 8) return; // Limit per feed
@@ -466,7 +529,7 @@ async function fetchFeed(feed) {
         // Create unique ID from link hash
         const uniqueId = 'art_' + hashCode(link + feed.name);
 
-        articles.push({
+        feedArticles.push({
             id: uniqueId,
             title: cleanHTML(title),
             description: cleanHTML(description).slice(0, 300),
@@ -483,7 +546,7 @@ async function fetchFeed(feed) {
         });
     });
 
-    return articles;
+    return feedArticles;
 }
 
 function extractKeywords(title) {
@@ -618,7 +681,7 @@ function renderArticles() {
             : '';
 
         return `
-            <div class="article-item ${article.id === currentArticle?.id ? 'active' : ''} ${article.read ? 'read' : ''}" data-id="${article.id}">
+            <div class="article-item ${article.id === currentArticle?.id ? 'active' : ''} ${article.read ? 'read' : ''}" data-id="${article.id}" role="option" aria-selected="${article.id === currentArticle?.id}" tabindex="0">
                 <div class="article-item-header">
                     <div class="article-tags">
                         ${article.keywords.slice(0, 2).map(k => `<span class="tag">${escapeHTML(k)}</span>`).join('')}
@@ -759,13 +822,14 @@ function filterArticles() {
 }
 
 let articleViewStart = null;
+let articleViewVersion = 0; // Guards against image loading race conditions
 
 function trackReadTime() {
     if (currentArticle && articleViewStart) {
         const duration = Math.round((performance.now() - articleViewStart) / 1000);
         if (duration >= 5) {
             // Save read time per article
-            const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
+            const readTimes = safeParse('readTimes', {});
             readTimes[currentArticle.id] = {
                 seconds: duration,
                 source: currentArticle.source,
@@ -785,8 +849,8 @@ function showArticle(article) {
     currentArticle = article;
     article.read = true;
 
-    // Save read state
-    localStorage.setItem('articles', JSON.stringify(articles));
+    // Save read state (debounced - frequent during navigation)
+    saveArticlesDebounced();
 
     // Update sidebar
     document.querySelectorAll('.article-item').forEach(item => {
@@ -880,14 +944,20 @@ function showArticle(article) {
     }
 
     // Fetch and display OG image with fade-in, fallback to AI-generated image
+    const thisViewVersion = ++articleViewVersion;
     fetchOGImage(article.link).then(async imageUrl => {
+        // Abort if user navigated to a different article
+        if (articleViewVersion !== thisViewVersion) return;
+
         const imageContainer = document.getElementById('articleImage');
         if (!imageContainer) return;
 
         if (!imageUrl) {
-            // Try AI-generated fallback image
             imageUrl = await fetchGeminiImage(article.title, article.keywords);
         }
+
+        // Re-check after async fallback
+        if (articleViewVersion !== thisViewVersion) return;
 
         if (imageUrl) {
             const img = document.createElement('img');
@@ -952,7 +1022,7 @@ function toggleLike(id) {
     if (article) {
         article.liked = !article.liked;
         if (article.liked) article.disliked = false;
-        localStorage.setItem('articles', JSON.stringify(articles));
+        saveArticlesDebounced();
         showArticle(article);
     }
 }
@@ -962,7 +1032,7 @@ function toggleDislike(id) {
     if (article) {
         article.disliked = !article.disliked;
         if (article.disliked) article.liked = false;
-        localStorage.setItem('articles', JSON.stringify(articles));
+        saveArticlesDebounced();
         showArticle(article);
     }
 }
@@ -971,7 +1041,7 @@ function toggleBookmark(id) {
     const article = articles.find(a => a.id === id);
     if (article) {
         article.bookmarked = !article.bookmarked;
-        localStorage.setItem('articles', JSON.stringify(articles));
+        saveArticlesDebounced();
         showToast(article.bookmarked ? 'Bookmarked' : 'Bookmark removed');
         showArticle(article);
         renderArticles();
@@ -1000,7 +1070,7 @@ async function generateSummary(id) {
     if (!article) return;
 
     if (settings.useOwnKey && !settings.apiKey) {
-        alert('Please set your API key in Settings, or uncheck "Use my own API key" to use the shared key.');
+        showToast('Set your API key in Settings, or uncheck "Use my own API key"');
         settingsModal.classList.add('open');
         return;
     }
@@ -1023,7 +1093,7 @@ async function generateSummary(id) {
         const cacheData = await cacheRes.json();
         if (cacheData.cached && cacheData.summary) {
             article.summary = cacheData.summary;
-            localStorage.setItem('articles', JSON.stringify(articles));
+            saveArticlesNow();
             summaryContent.innerHTML = formatSummary(article.summary);
             return;
         }
@@ -1036,7 +1106,7 @@ async function generateSummary(id) {
         article.summary = summary;
 
         // Save to localStorage
-        localStorage.setItem('articles', JSON.stringify(articles));
+        saveArticlesNow();
 
         // 3. Save to server cache (fire-and-forget)
         fetch('/api/summary-cache', {
@@ -1177,13 +1247,13 @@ async function runSmartFilter() {
 async function scoreBatch(batch) {
     const filterInterests = settings.filterInterests || 'AI, machine learning, LLMs, generative AI, tech industry';
 
-    const articleList = batch.map((a, i) =>
+    const batchList = batch.map((a, i) =>
         `[${i}] ${a.title} (${a.source})`
     ).join('\n');
 
     // Build preference context from implicit feedback
     let prefContext = '';
-    const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
+    const readTimes = safeParse('readTimes', {});
     const entries = Object.values(readTimes);
     if (entries.length >= 5) {
         const engaged = entries.filter(e => e.seconds >= 30);
@@ -1202,7 +1272,7 @@ async function scoreBatch(batch) {
 
     const prompt = `You are a news relevance filter. Score these articles 1-10 for someone interested in: ${filterInterests}${prefContext}
 
-${articleList}
+${batchList}
 
 Return JSON: {"articles":[{"i":0,"s":7,"r":"reason for score","t":"one sentence summary"},...]}"
 - i: index, s: score (1=irrelevant, 10=must read), r: one-sentence reason for the score, t: one-sentence TL;DR
@@ -1230,7 +1300,7 @@ Respond with ONLY valid JSON.`;
     });
 
     localStorage.setItem('articleScores', JSON.stringify(articleScores));
-    localStorage.setItem('articles', JSON.stringify(articles));
+    saveArticlesNow();
     console.log(`✅ Scored ${result.articles.length} articles`);
 }
 
@@ -1297,6 +1367,31 @@ function showToast(message) {
     toast.textContent = message;
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 2200);
+}
+
+// Confirm dialog (replaces native confirm())
+function showConfirmDialog(message, onConfirm) {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+        <div class="confirm-dialog">
+            <p>${escapeHTML(message)}</p>
+            <div class="confirm-actions">
+                <button class="btn-secondary confirm-cancel">Cancel</button>
+                <button class="btn-primary confirm-ok" style="background:var(--danger);">Delete</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.confirm-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('.confirm-ok').addEventListener('click', () => {
+        overlay.remove();
+        onConfirm();
+    });
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
 }
 
 // Score badge helper
@@ -1391,7 +1486,7 @@ async function renderBriefing() {
             </div>
         </div>`;
 
-    const articleList = topArticles.map((a, i) => {
+    const briefingList = topArticles.map((a, i) => {
         const score = articleScores[a.id] || '?';
         return `[${i+1}] "${a.title}" (${a.source}, score: ${score}/10)\n    ${a.description?.substring(0, 150) || ''}`;
     }).join('\n\n');
@@ -1400,7 +1495,7 @@ async function renderBriefing() {
 
 Today's top ${topArticles.length} articles (scored by AI relevance):
 
-${articleList}
+${briefingList}
 
 Write a concise daily briefing with:
 1. **HEADLINE** — The single most important story in one sentence
@@ -1676,6 +1771,94 @@ function showMobileContent() {
 
 function hideMobileContent() {
     articleContent.classList.remove('mobile-visible');
+}
+
+// ==================== KEYBOARD SHORTCUTS ====================
+
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Skip if user is typing in an input/textarea/select
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+        // Skip if modal is open
+        if (settingsModal.classList.contains('open')) {
+            if (e.key === 'Escape') settingsModal.classList.remove('open');
+            return;
+        }
+
+        switch (e.key) {
+            case 'j': // Next article
+            case 'ArrowDown': {
+                e.preventDefault();
+                navigateArticle(1);
+                break;
+            }
+            case 'k': // Previous article
+            case 'ArrowUp': {
+                e.preventDefault();
+                navigateArticle(-1);
+                break;
+            }
+            case 'Enter': { // Open selected article
+                if (currentArticle) {
+                    showArticle(currentArticle);
+                }
+                break;
+            }
+            case 'b': { // Toggle bookmark
+                if (currentArticle) {
+                    toggleBookmark(currentArticle.id);
+                }
+                break;
+            }
+            case 'o': { // Open original
+                if (currentArticle) {
+                    window.open(currentArticle.link, '_blank', 'noopener,noreferrer');
+                }
+                break;
+            }
+            case 'r': { // Refresh feeds
+                loadArticles(true);
+                break;
+            }
+            case '/': { // Focus search
+                e.preventDefault();
+                searchInput.focus();
+                break;
+            }
+            case 'Escape': { // Go back (mobile) or deselect
+                if (isMobile && articleContent.classList.contains('mobile-visible')) {
+                    hideMobileContent();
+                }
+                break;
+            }
+            case '?': { // Show keyboard shortcuts help
+                showToast('Keys: j/k navigate, Enter open, b bookmark, o original, r refresh, / search');
+                break;
+            }
+        }
+    });
+}
+
+function navigateArticle(direction) {
+    const filter = document.querySelector('.filter-btn.active')?.dataset.filter || 'smart';
+    if (filter === 'briefing') return;
+
+    const visibleItems = [...document.querySelectorAll('.article-item')];
+    if (visibleItems.length === 0) return;
+
+    const currentIndex = visibleItems.findIndex(item => item.dataset.id === currentArticle?.id);
+    const nextIndex = Math.max(0, Math.min(visibleItems.length - 1, currentIndex + direction));
+
+    const nextItem = visibleItems[nextIndex];
+    if (nextItem) {
+        const article = articles.find(a => a.id === nextItem.dataset.id);
+        if (article) {
+            showArticle(article);
+            nextItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }
 }
 
 // ==================== THEME TOGGLE ====================
