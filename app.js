@@ -1,37 +1,179 @@
 // Weft — Pattern from noise (Web Version)
 // Credits: Kristoffer Åström (idea), Johan Salo (implementation)
 
-const DEFAULT_FEEDS = [
-    // Tier 1: Daily News
-    { name: 'The Rundown AI', url: 'https://rss.beehiiv.com/feeds/2R3C6Bt5wj.xml', category: 'daily' },
-    { name: 'Hacker News', url: 'https://hnrss.org/frontpage', category: 'daily' },
-    { name: 'Last Week in AI', url: 'https://lastweekin.ai/feed', category: 'daily' },
-    { name: 'Import AI', url: 'https://importai.substack.com/feed', category: 'daily' },
-    { name: 'The Batch', url: 'https://www.deeplearning.ai/the-batch/feed/', category: 'daily' },
+// ==================== SUPABASE ====================
+const SUPABASE_URL = 'https://actadsweocnjodxfswnh.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjdGFkc3dlb2Nuam9keGZzd25oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNDExODMsImV4cCI6MjA4NjcxNzE4M30.5Nans_6e2uYCPVFYQCyOa-OmZMwCL32XENLfegS6H6s';
+let _supabaseClient = null;
+let currentUser = null;
 
-    // Tier 2: Major Publications
-    { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', category: 'publication' },
-    { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/technology-lab', category: 'publication' },
-    { name: 'The Verge AI', url: 'https://www.theverge.com/ai-artificial-intelligence/rss/index.xml', category: 'publication' },
-    { name: 'Wired AI', url: 'https://www.wired.com/feed/tag/ai/latest/rss', category: 'publication' },
-    { name: 'VentureBeat AI', url: 'https://venturebeat.com/category/ai/feed/', category: 'publication' },
-    { name: 'TechCrunch AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', category: 'publication' },
+// ==================== CATEGORIES & FEEDS ====================
+// Named content categories, each with curated RSS feeds.
+// DEFAULT_FEEDS is derived from this structure for backward compatibility.
 
-    // Tier 3: Thought Leaders (Substack - reliable feeds)
-    { name: 'Ethan Mollick', url: 'https://www.oneusefulthing.org/feed', category: 'thought-leader' },
-    { name: 'Gary Marcus', url: 'https://garymarcus.substack.com/feed', category: 'thought-leader' },
-    { name: 'Zvi Mowshowitz', url: 'https://thezvi.substack.com/feed', category: 'thought-leader' },
-    { name: 'Interconnects', url: 'https://www.interconnects.ai/feed', category: 'thought-leader' },
+const CATEGORIES = {
+    tech: {
+        label: 'Tech & AI',
+        feeds: [
+            // AI newsletters & daily digests
+            { name: 'The Rundown AI', url: 'https://rss.beehiiv.com/feeds/2R3C6Bt5wj.xml' },
+            { name: 'Last Week in AI', url: 'https://lastweekin.ai/feed' },
+            { name: 'Import AI', url: 'https://importai.substack.com/feed' },
+            { name: 'The Batch', url: 'https://www.deeplearning.ai/the-batch/feed/' },
+            { name: 'TLDR AI', url: 'https://tldr.tech/ai/rss' },
+            // Community
+            { name: 'Hacker News', url: 'https://hnrss.org/frontpage' },
+            // Major publications
+            { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/' },
+            { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/technology-lab' },
+            { name: 'The Verge AI', url: 'https://www.theverge.com/ai-artificial-intelligence/rss/index.xml' },
+            { name: 'Wired AI', url: 'https://www.wired.com/feed/tag/ai/latest/rss' },
+            { name: 'VentureBeat AI', url: 'https://venturebeat.com/category/ai/feed/' },
+            { name: 'TechCrunch AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/' },
+            { name: 'The Register', url: 'https://www.theregister.com/headlines.atom' },
+            { name: 'InfoQ', url: 'https://feed.infoq.com/' },
+            // Thought leaders
+            { name: 'Ethan Mollick', url: 'https://www.oneusefulthing.org/feed' },
+            { name: 'Gary Marcus', url: 'https://garymarcus.substack.com/feed' },
+            { name: 'Zvi Mowshowitz', url: 'https://thezvi.substack.com/feed' },
+            { name: 'Interconnects', url: 'https://www.interconnects.ai/feed' },
+            { name: 'Platformer', url: 'https://www.platformer.news/rss' },
+            { name: 'Benedict Evans', url: 'https://www.ben-evans.com/benedictevans/rss.xml' },
+            // Company blogs
+            { name: 'OpenAI', url: 'https://openai.com/blog/rss/' },
+            { name: 'Anthropic', url: 'https://www.anthropic.com/rss' },
+            { name: 'Hugging Face', url: 'https://huggingface.co/blog/feed.xml' },
+            { name: 'Google DeepMind', url: 'https://deepmind.google/blog/rss.xml' },
+            { name: 'Meta AI', url: 'https://ai.meta.com/blog/feed/' },
+            { name: 'a16z', url: 'https://a16z.com/feed/' },
+        ]
+    },
 
-    // Tier 4: Design & UX
-    { name: 'Jakob Nielsen', url: 'https://jakobnielsenphd.substack.com/feed', category: 'design' },
-    { name: 'UX Collective', url: 'https://uxdesign.cc/feed', category: 'design' },
-    { name: 'Nielsen Norman', url: 'https://www.nngroup.com/feed/rss/', category: 'design' },
+    world: {
+        label: 'World',
+        feeds: [
+            { name: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+            { name: 'Reuters Top News', url: 'https://feeds.reuters.com/reuters/topNews' },
+            { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
+            { name: 'The Guardian World', url: 'https://www.theguardian.com/world/rss' },
+            { name: 'NPR News', url: 'https://feeds.npr.org/1001/rss.xml' },
+            { name: 'Deutsche Welle', url: 'https://rss.dw.com/rdf/rss-en-all' },
+            { name: 'France 24', url: 'https://www.france24.com/en/rss' },
+            { name: 'NYT World', url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml' },
+            { name: 'Foreign Policy', url: 'https://foreignpolicy.com/feed/' },
+            { name: 'The Economist', url: 'https://www.economist.com/rss' },
+            { name: 'Associated Press', url: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml' },
+            { name: 'Axios World', url: 'https://api.axios.com/feed/axios-world' },
+        ]
+    },
 
-    // Tier 5: Company Blogs & Research
-    { name: 'OpenAI', url: 'https://openai.com/blog/rss/', category: 'company' },
-    { name: 'Hugging Face', url: 'https://huggingface.co/blog/feed.xml', category: 'company' },
-];
+    business: {
+        label: 'Business',
+        feeds: [
+            { name: 'Bloomberg Markets', url: 'https://feeds.bloomberg.com/markets/news.rss' },
+            { name: 'Bloomberg Technology', url: 'https://feeds.bloomberg.com/technology/news.rss' },
+            { name: 'WSJ Business', url: 'https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml' },
+            { name: 'Harvard Business Review', url: 'https://hbr.org/rss/all' },
+            { name: 'Inc.', url: 'https://www.inc.com/rss/' },
+            { name: 'Fast Company', url: 'https://www.fastcompany.com/latest/rss' },
+            { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
+            { name: 'Axios Pro Rata', url: 'https://api.axios.com/feed/axios-pro-rata' },
+            { name: 'CNBC Business', url: 'https://www.cnbc.com/id/10000664/device/rss/rss.html' },
+            { name: 'Forbes', url: 'https://www.forbes.com/real-time/feed2/' },
+            { name: 'Quartz', url: 'https://qz.com/feed' },
+            { name: 'Business Insider', url: 'https://feeds.businessinsider.com/custom/all' },
+        ]
+    },
+
+    science: {
+        label: 'Science',
+        feeds: [
+            { name: 'Nature', url: 'https://www.nature.com/nature.rss' },
+            { name: 'Science News', url: 'https://www.sciencenews.org/feed' },
+            { name: 'New Scientist', url: 'https://www.newscientist.com/feed/home/' },
+            { name: 'NASA Breaking News', url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss' },
+            { name: 'Scientific American', url: 'https://rss.sciam.com/Scientific-American-Global' },
+            { name: 'Quanta Magazine', url: 'https://api.quantamagazine.org/feed/' },
+            { name: 'Phys.org', url: 'https://phys.org/rss-feed/' },
+            { name: 'Popular Science', url: 'https://www.popsci.com/rss.xml' },
+            { name: 'The Scientist', url: 'https://www.the-scientist.com/rss/' },
+            { name: 'Live Science', url: 'https://www.livescience.com/feeds/all' },
+            { name: 'EurekAlert', url: 'https://www.eurekalert.org/rss.xml' },
+            { name: 'Space.com', url: 'https://www.space.com/feeds/all' },
+        ]
+    },
+
+    politics: {
+        label: 'Politics',
+        feeds: [
+            { name: 'Politico', url: 'https://www.politico.com/rss/politicopicks.xml' },
+            { name: 'The Hill', url: 'https://thehill.com/feed/' },
+            { name: 'The Atlantic Politics', url: 'https://www.theatlantic.com/feed/channel/politics/' },
+            { name: 'Vox', url: 'https://www.vox.com/rss/index.xml' },
+            { name: 'Axios Politics', url: 'https://api.axios.com/feed/axios-politics' },
+            { name: 'BBC Politics', url: 'https://feeds.bbci.co.uk/news/politics/rss.xml' },
+            { name: 'The Guardian US Politics', url: 'https://www.theguardian.com/us-news/us-politics/rss' },
+            { name: 'Mother Jones', url: 'https://www.motherjones.com/feed/' },
+            { name: 'Reason', url: 'https://reason.com/latest/feed/' },
+            { name: 'RealClearPolitics', url: 'https://www.realclearpolitics.com/index.xml' },
+        ]
+    },
+
+    sports: {
+        label: 'Sports',
+        feeds: [
+            { name: 'ESPN Top Stories', url: 'https://www.espn.com/espn/rss/news' },
+            { name: 'BBC Sport', url: 'https://feeds.bbci.co.uk/sport/rss.xml' },
+            { name: 'Sports Illustrated', url: 'https://www.si.com/rss/si_topstories.rss' },
+            { name: 'Yahoo Sports', url: 'https://sports.yahoo.com/rss/' },
+            { name: 'The Guardian Sport', url: 'https://www.theguardian.com/sport/rss' },
+            { name: 'Bleacher Report', url: 'https://bleacherreport.com/articles/feed' },
+            { name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/' },
+            { name: 'Sporting News', url: 'https://www.sportingnews.com/us/rss' },
+            { name: 'NBC Sports', url: 'https://nbcsports.com/rss' },
+            { name: 'Sky Sports', url: 'https://www.skysports.com/rss/12040' },
+        ]
+    },
+
+    culture: {
+        label: 'Culture',
+        feeds: [
+            { name: 'The New Yorker', url: 'https://www.newyorker.com/feed/everything' },
+            { name: 'Pitchfork', url: 'https://pitchfork.com/rss/news/feed.xml' },
+            { name: 'The Atlantic Culture', url: 'https://www.theatlantic.com/feed/channel/entertainment/' },
+            { name: 'Rolling Stone', url: 'https://www.rollingstone.com/feed/' },
+            { name: 'Variety', url: 'https://variety.com/feed/' },
+            { name: 'Hollywood Reporter', url: 'https://www.hollywoodreporter.com/feed/' },
+            { name: 'Vulture', url: 'https://www.vulture.com/rss/index.xml' },
+            { name: 'AV Club', url: 'https://www.avclub.com/rss' },
+            { name: 'NPR Arts', url: 'https://feeds.npr.org/1008/rss.xml' },
+            { name: 'Arts & Letters Daily', url: 'https://www.aldaily.com/feed/' },
+            { name: 'The Paris Review', url: 'https://www.theparisreview.org/feed' },
+            { name: 'Consequence', url: 'https://consequence.net/feed/' },
+        ]
+    },
+
+    design: {
+        label: 'Design & UX',
+        feeds: [
+            { name: 'Jakob Nielsen', url: 'https://jakobnielsenphd.substack.com/feed' },
+            { name: 'UX Collective', url: 'https://uxdesign.cc/feed' },
+            { name: 'Nielsen Norman', url: 'https://www.nngroup.com/feed/rss/' },
+            { name: 'Smashing Magazine', url: 'https://www.smashingmagazine.com/feed/' },
+            { name: 'A List Apart', url: 'https://alistapart.com/main/feed/' },
+            { name: 'CSS-Tricks', url: 'https://css-tricks.com/feed/' },
+            { name: 'Creative Bloq', url: 'https://www.creativebloq.com/feed' },
+            { name: 'Designmodo', url: 'https://designmodo.com/feed/' },
+            { name: 'Sidebar.io', url: 'https://sidebar.io/feed.xml' },
+            { name: 'Muzli Design', url: 'https://medium.muz.li/feed' },
+        ]
+    },
+};
+
+// Flat list derived from CATEGORIES — used everywhere feeds are needed
+const DEFAULT_FEEDS = Object.entries(CATEGORIES).flatMap(([catKey, cat]) =>
+    cat.feeds.map(f => ({ ...f, category: catKey }))
+);
 
 // Feed management: merge defaults with user customizations
 let disabledFeeds = JSON.parse(localStorage.getItem('disabledFeeds') || '[]');
@@ -114,8 +256,361 @@ const deleteStyleBtn = document.getElementById('deleteStyleBtn');
 const saveAsNewStyleBtn = document.getElementById('saveAsNewStyle');
 const customStyleNameInput = document.getElementById('customStyleName');
 
+// ==================== SUPABASE INIT & AUTH ====================
+
+function initSupabase() {
+    if (SUPABASE_URL.includes('YOUR_PROJECT_REF')) {
+        console.log('Supabase not configured, running in offline mode');
+        return;
+    }
+
+    // The CDN sets window.supabase — find createClient
+    const sb = window.supabase;
+    const createClient = sb && (sb.createClient || sb.default?.createClient);
+
+    if (!createClient) {
+        console.warn('Supabase SDK not available. window.supabase =', typeof sb, sb);
+        return;
+    }
+
+    try {
+        _supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (e) {
+        console.error('Supabase init failed:', e);
+        return;
+    }
+
+    _supabaseClient.auth.onAuthStateChange((event, session) => {
+        handleAuthStateChange(event, session);
+    });
+
+    // Check existing session
+    _supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+            currentUser = session.user;
+            updateAuthUI();
+            loadFromSupabase();
+        }
+    });
+}
+
+function handleAuthStateChange(event, session) {
+    if (event === 'SIGNED_IN' && session) {
+        currentUser = session.user;
+        updateAuthUI();
+        // First login: push localStorage data to Supabase
+        syncToSupabase();
+        loadFromSupabase();
+        showToast('Signed in');
+    } else if (event === 'SIGNED_OUT') {
+        currentUser = null;
+        updateAuthUI();
+        showToast('Signed out');
+    }
+}
+
+function updateAuthUI() {
+    const authBtn = document.getElementById('authBtn');
+    if (!authBtn) return;
+
+    if (currentUser) {
+        const email = currentUser.email || '';
+        const initial = email.charAt(0).toUpperCase() || '?';
+        authBtn.innerHTML = `<span class="auth-initial">${escapeHTML(initial)}</span>`;
+        authBtn.title = email;
+        authBtn.classList.add('authenticated');
+    } else {
+        authBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+        authBtn.title = 'Sign in';
+        authBtn.classList.remove('authenticated');
+    }
+}
+
+function openAuthModal() {
+    const modal = document.getElementById('authModal');
+    const formView = document.getElementById('authFormView');
+    const checkView = document.getElementById('authCheckEmailView');
+    const userView = document.getElementById('authUserView');
+
+    if (currentUser) {
+        formView.style.display = 'none';
+        checkView.style.display = 'none';
+        userView.style.display = '';
+        document.getElementById('authModalTitle').textContent = 'Account';
+        document.getElementById('authUserEmail').textContent = currentUser.email;
+        document.getElementById('authAvatar').textContent = (currentUser.email || '?').charAt(0).toUpperCase();
+        const created = new Date(currentUser.created_at);
+        document.getElementById('authUserSince').textContent = `Member since ${created.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+    } else {
+        formView.style.display = '';
+        checkView.style.display = 'none';
+        userView.style.display = 'none';
+        document.getElementById('authModalTitle').textContent = 'Sign in';
+    }
+
+    modal.classList.add('open');
+}
+
+async function signInWithEmail() {
+    if (!_supabaseClient) {
+        showToast('Supabase not configured');
+        return;
+    }
+    const emailInput = document.getElementById('authEmail');
+    const email = emailInput.value.trim();
+    if (!email) {
+        showToast('Enter your email');
+        return;
+    }
+
+    const btn = document.getElementById('authSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    const { error } = await _supabaseClient.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.origin }
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'Send magic link';
+
+    if (error) {
+        showToast('Error: ' + error.message);
+        return;
+    }
+
+    // Show "check email" view
+    document.getElementById('authFormView').style.display = 'none';
+    document.getElementById('authCheckEmailView').style.display = '';
+    document.getElementById('authSentEmail').textContent = email;
+}
+
+async function signOut() {
+    if (!_supabaseClient) return;
+    await _supabaseClient.auth.signOut();
+    document.getElementById('authModal').classList.remove('open');
+}
+
+// ==================== SUPABASE SYNC ====================
+
+async function syncToSupabase() {
+    if (!_supabaseClient || !currentUser) return;
+    try {
+        await saveProfileToSupabase();
+        await syncInteractionsToSupabase();
+    } catch (e) {
+        console.error('Sync to Supabase failed:', e);
+    }
+}
+
+async function loadFromSupabase() {
+    if (!_supabaseClient || !currentUser) return;
+    try {
+        await loadProfileFromSupabase();
+        await loadInteractionsFromSupabase();
+    } catch (e) {
+        console.error('Load from Supabase failed:', e);
+    }
+}
+
+async function saveProfileToSupabase() {
+    if (!_supabaseClient || !currentUser) return;
+    const profile = {
+        id: currentUser.id,
+        filter_interests: settings.filterInterests,
+        filter_threshold: settings.filterThreshold,
+        summary_style: settings.summaryStyle,
+        llm_provider: settings.provider,
+        use_own_key: settings.useOwnKey,
+        custom_styles: customStyles,
+        disabled_feeds: disabledFeeds,
+        custom_feeds: customFeeds,
+        theme: localStorage.getItem('theme') || 'dark',
+        sidebar_width: parseInt(localStorage.getItem('sidebarWidth') || '400')
+    };
+
+    const { error } = await _supabaseClient
+        .from('profiles')
+        .upsert(profile, { onConflict: 'id' });
+
+    if (error) console.error('Save profile error:', error);
+}
+
+async function loadProfileFromSupabase() {
+    if (!_supabaseClient || !currentUser) return;
+
+    const { data, error } = await _supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single();
+
+    if (error || !data) return;
+
+    // Only apply if Supabase has non-default data
+    if (data.filter_interests) {
+        settings.filterInterests = data.filter_interests;
+        localStorage.setItem('filterInterests', data.filter_interests);
+    }
+    if (data.filter_threshold) {
+        settings.filterThreshold = data.filter_threshold;
+        localStorage.setItem('filterThreshold', data.filter_threshold.toString());
+    }
+    if (data.summary_style) {
+        settings.summaryStyle = data.summary_style;
+        localStorage.setItem('summaryStyle', data.summary_style);
+    }
+    if (data.llm_provider) {
+        settings.provider = data.llm_provider;
+        localStorage.setItem('llmProvider', data.llm_provider);
+    }
+    if (data.use_own_key !== null) {
+        settings.useOwnKey = data.use_own_key;
+        localStorage.setItem('useOwnKey', data.use_own_key.toString());
+    }
+    if (data.custom_styles && Object.keys(data.custom_styles).length > 0) {
+        customStyles = data.custom_styles;
+        localStorage.setItem('customStyles', JSON.stringify(customStyles));
+        loadCustomStyles();
+    }
+    if (data.disabled_feeds && data.disabled_feeds.length > 0) {
+        disabledFeeds = data.disabled_feeds;
+        localStorage.setItem('disabledFeeds', JSON.stringify(disabledFeeds));
+    }
+    if (data.custom_feeds && data.custom_feeds.length > 0) {
+        customFeeds = data.custom_feeds;
+        localStorage.setItem('customFeeds', JSON.stringify(customFeeds));
+    }
+    if (data.theme) {
+        localStorage.setItem('theme', data.theme);
+        document.documentElement.setAttribute('data-theme', data.theme);
+        updateThemeIcon(data.theme);
+    }
+    if (data.sidebar_width && data.sidebar_width !== 400) {
+        localStorage.setItem('sidebarWidth', data.sidebar_width.toString());
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar && !isMobile) {
+            sidebar.style.width = data.sidebar_width + 'px';
+            sidebar.style.minWidth = data.sidebar_width + 'px';
+            document.documentElement.style.setProperty('--sidebar-width', data.sidebar_width + 'px');
+        }
+    }
+}
+
+async function saveInteractionToSupabase(articleId, data) {
+    if (!_supabaseClient || !currentUser) return;
+
+    const row = {
+        user_id: currentUser.id,
+        article_id: articleId,
+        ...data
+    };
+
+    const { error } = await _supabaseClient
+        .from('article_interactions')
+        .upsert(row, { onConflict: 'user_id,article_id' });
+
+    if (error) console.error('Save interaction error:', error);
+}
+
+async function syncInteractionsToSupabase() {
+    if (!_supabaseClient || !currentUser) return;
+
+    // Gather all interactions from localStorage articles
+    const localArticles = JSON.parse(localStorage.getItem('articles') || '[]');
+    const localScores = JSON.parse(localStorage.getItem('articleScores') || '{}');
+    const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
+
+    const rows = [];
+    const seen = new Set();
+
+    localArticles.forEach(a => {
+        if (seen.has(a.id)) return;
+        const hasInteraction = a.liked || a.disliked || a.bookmarked || a.read || a.summary || localScores[a.id] !== undefined;
+        if (!hasInteraction) return;
+        seen.add(a.id);
+
+        rows.push({
+            user_id: currentUser.id,
+            article_id: a.id,
+            score: localScores[a.id] ?? null,
+            score_reason: a.scoreReason || null,
+            groq_summary: a.groqSummary || null,
+            read: a.read || false,
+            read_duration_seconds: readTimes[a.id]?.seconds || 0,
+            bookmarked: a.bookmarked || false,
+            liked: a.liked || false,
+            disliked: a.disliked || false,
+            summary: a.summary || null,
+            summary_style: a.summary ? (settings.summaryStyle || null) : null
+        });
+    });
+
+    if (rows.length === 0) return;
+
+    // Batch upsert in chunks of 50
+    for (let i = 0; i < rows.length; i += 50) {
+        const chunk = rows.slice(i, i + 50);
+        const { error } = await _supabaseClient
+            .from('article_interactions')
+            .upsert(chunk, { onConflict: 'user_id,article_id' });
+        if (error) console.error('Batch sync error:', error);
+    }
+}
+
+async function loadInteractionsFromSupabase() {
+    if (!_supabaseClient || !currentUser) return;
+
+    const { data, error } = await _supabaseClient
+        .from('article_interactions')
+        .select('*')
+        .eq('user_id', currentUser.id);
+
+    if (error || !data || data.length === 0) return;
+
+    // Merge into local state
+    const localScores = JSON.parse(localStorage.getItem('articleScores') || '{}');
+    const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
+
+    data.forEach(row => {
+        // Update article scores
+        if (row.score !== null) {
+            localScores[row.article_id] = row.score;
+        }
+
+        // Update read times
+        if (row.read_duration_seconds > 0) {
+            readTimes[row.article_id] = {
+                seconds: row.read_duration_seconds,
+                ts: new Date(row.updated_at).getTime()
+            };
+        }
+
+        // Update article in articles array
+        const article = articles.find(a => a.id === row.article_id);
+        if (article) {
+            if (row.liked) article.liked = true;
+            if (row.disliked) article.disliked = true;
+            if (row.bookmarked) article.bookmarked = true;
+            if (row.read) article.read = true;
+            if (row.summary) article.summary = row.summary;
+            if (row.score_reason) article.scoreReason = row.score_reason;
+            if (row.groq_summary) article.groqSummary = row.groq_summary;
+        }
+    });
+
+    articleScores = localScores;
+    localStorage.setItem('articleScores', JSON.stringify(articleScores));
+    localStorage.setItem('readTimes', JSON.stringify(readTimes));
+    localStorage.setItem('articles', JSON.stringify(articles));
+
+    renderArticles();
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    initSupabase();
     loadCustomStyles();
     loadSettings();
     loadArticles();
@@ -128,6 +623,22 @@ function setupEventListeners() {
     refreshBtn.addEventListener('click', () => loadArticles(true));
     settingsBtn.addEventListener('click', openSettings);
     closeSettings.addEventListener('click', () => settingsModal.classList.remove('open'));
+
+    // Auth events
+    document.getElementById('authBtn').addEventListener('click', openAuthModal);
+    document.getElementById('closeAuth').addEventListener('click', () => document.getElementById('authModal').classList.remove('open'));
+    document.getElementById('authSubmitBtn').addEventListener('click', signInWithEmail);
+    document.getElementById('authEmail').addEventListener('keydown', (e) => { if (e.key === 'Enter') signInWithEmail(); });
+    document.getElementById('authSignOutBtn').addEventListener('click', signOut);
+    document.getElementById('authSyncNowBtn').addEventListener('click', async () => {
+        document.getElementById('authSyncStatus').textContent = 'Syncing...';
+        await syncToSupabase();
+        await loadFromSupabase();
+        document.getElementById('authSyncStatus').textContent = 'Synced just now';
+    });
+    document.getElementById('authModal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('authModal')) document.getElementById('authModal').classList.remove('open');
+    });
     saveSettingsBtn.addEventListener('click', saveSettings);
     searchInput.addEventListener('input', handleSearch);
     searchInput.addEventListener('keydown', (e) => {
@@ -172,19 +683,53 @@ function setupEventListeners() {
 
 function renderFeedManager() {
     const container = document.getElementById('feedManager');
-    const allFeeds = [...DEFAULT_FEEDS.map(f => ({ ...f, isDefault: true })), ...customFeeds.map(f => ({ ...f, isDefault: false }))];
+    let html = '';
 
-    container.innerHTML = allFeeds.map(feed => {
-        const enabled = !disabledFeeds.includes(feed.url);
-        return `
-            <div class="feed-item">
-                <input type="checkbox" ${enabled ? 'checked' : ''} data-url="${escapeHTML(feed.url)}" onchange="toggleFeed(this)">
-                <span class="feed-name">${escapeHTML(feed.name)}</span>
-                <span class="feed-category">${escapeHTML(feed.category)}</span>
-                ${!feed.isDefault ? `<button class="feed-remove" onclick="removeCustomFeed('${escapeJSString(feed.url)}')" title="Remove">&times;</button>` : ''}
+    // Built-in feeds grouped by category
+    Object.entries(CATEGORIES).forEach(([catKey, cat]) => {
+        const enabledCount = cat.feeds.filter(f => !disabledFeeds.includes(f.url)).length;
+        html += `
+            <div class="feed-category-section">
+                <div class="feed-category-header">
+                    <span class="feed-category-label">${escapeHTML(cat.label)}</span>
+                    <span class="feed-category-count">${enabledCount}/${cat.feeds.length}</span>
+                </div>
+                ${cat.feeds.map(feed => {
+                    const enabled = !disabledFeeds.includes(feed.url);
+                    return `
+                        <div class="feed-item">
+                            <input type="checkbox" ${enabled ? 'checked' : ''} data-url="${escapeHTML(feed.url)}" onchange="toggleFeed(this)">
+                            <span class="feed-name">${escapeHTML(feed.name)}</span>
+                        </div>
+                    `;
+                }).join('')}
             </div>
         `;
-    }).join('');
+    });
+
+    // Custom feeds section
+    if (customFeeds.length > 0) {
+        html += `
+            <div class="feed-category-section">
+                <div class="feed-category-header">
+                    <span class="feed-category-label">Custom</span>
+                    <span class="feed-category-count">${customFeeds.filter(f => !disabledFeeds.includes(f.url)).length}/${customFeeds.length}</span>
+                </div>
+                ${customFeeds.map(feed => {
+                    const enabled = !disabledFeeds.includes(feed.url);
+                    return `
+                        <div class="feed-item">
+                            <input type="checkbox" ${enabled ? 'checked' : ''} data-url="${escapeHTML(feed.url)}" onchange="toggleFeed(this)">
+                            <span class="feed-name">${escapeHTML(feed.name)}</span>
+                            <button class="feed-remove" onclick="removeCustomFeed('${escapeJSString(feed.url)}')" title="Remove">&times;</button>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
 }
 
 function toggleFeed(checkbox) {
@@ -195,6 +740,7 @@ function toggleFeed(checkbox) {
         disabledFeeds.push(url);
     }
     localStorage.setItem('disabledFeeds', JSON.stringify(disabledFeeds));
+    saveProfileToSupabase().catch(() => {});
 }
 
 function addCustomFeed() {
@@ -220,6 +766,7 @@ function addCustomFeed() {
     urlInput.value = '';
     renderFeedManager();
     showToast(`Added "${name}"`);
+    saveProfileToSupabase().catch(() => {});
 }
 
 function removeCustomFeed(url) {
@@ -228,6 +775,7 @@ function removeCustomFeed(url) {
     localStorage.setItem('customFeeds', JSON.stringify(customFeeds));
     localStorage.setItem('disabledFeeds', JSON.stringify(disabledFeeds));
     renderFeedManager();
+    saveProfileToSupabase().catch(() => {});
 }
 
 function loadCustomStyles() {
@@ -359,9 +907,12 @@ function saveSettings() {
     localStorage.setItem('summaryStyle', settings.summaryStyle);
 
     settingsModal.classList.remove('open');
-    
+
     // Re-render articles with new threshold
     renderArticles();
+
+    // Sync to Supabase (fire-and-forget)
+    saveProfileToSupabase().catch(() => {});
 }
 
 async function loadArticles(forceRefresh = false) {
@@ -773,6 +1324,12 @@ function trackReadTime() {
                 ts: Date.now()
             };
             localStorage.setItem('readTimes', JSON.stringify(readTimes));
+
+            // Sync to Supabase (fire-and-forget)
+            saveInteractionToSupabase(currentArticle.id, {
+                read: true,
+                read_duration_seconds: duration
+            }).catch(() => {});
         }
     }
 }
@@ -830,9 +1387,10 @@ function showArticle(article) {
                         <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
                     </svg>
                 </button>
-                <button class="action-btn" onclick="shareArticle(currentArticle)" title="Share">
+                <button class="action-btn" onclick="copyArticleLink(currentArticle)" title="Copy link">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/>
+                        <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+                        <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
                     </svg>
                 </button>
                 <div style="flex:1"></div>
@@ -954,6 +1512,7 @@ function toggleLike(id) {
         if (article.liked) article.disliked = false;
         localStorage.setItem('articles', JSON.stringify(articles));
         showArticle(article);
+        saveInteractionToSupabase(id, { liked: article.liked, disliked: article.disliked }).catch(() => {});
     }
 }
 
@@ -964,6 +1523,7 @@ function toggleDislike(id) {
         if (article.disliked) article.liked = false;
         localStorage.setItem('articles', JSON.stringify(articles));
         showArticle(article);
+        saveInteractionToSupabase(id, { disliked: article.disliked, liked: article.liked }).catch(() => {});
     }
 }
 
@@ -975,6 +1535,7 @@ function toggleBookmark(id) {
         showToast(article.bookmarked ? 'Bookmarked' : 'Bookmark removed');
         showArticle(article);
         renderArticles();
+        saveInteractionToSupabase(id, { bookmarked: article.bookmarked }).catch(() => {});
     }
 }
 
@@ -1044,6 +1605,9 @@ async function generateSummary(id) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id, style, summary })
         }).catch(() => {});
+
+        // 4. Save to Supabase (fire-and-forget)
+        saveInteractionToSupabase(id, { summary, summary_style: style }).catch(() => {});
 
         summaryContent.innerHTML = formatSummary(summary);
     } catch (error) {
@@ -1232,6 +1796,27 @@ Respond with ONLY valid JSON.`;
     localStorage.setItem('articleScores', JSON.stringify(articleScores));
     localStorage.setItem('articles', JSON.stringify(articles));
     console.log(`✅ Scored ${result.articles.length} articles`);
+
+    // Sync scores to Supabase (fire-and-forget)
+    if (_supabaseClient && currentUser) {
+        const rows = result.articles.map(scored => {
+            const article = batch[scored.i];
+            if (!article) return null;
+            return {
+                user_id: currentUser.id,
+                article_id: article.id,
+                score: scored.s,
+                score_reason: scored.r || null,
+                groq_summary: scored.t || null
+            };
+        }).filter(Boolean);
+
+        if (rows.length > 0) {
+            _supabaseClient.from('article_interactions')
+                .upsert(rows, { onConflict: 'user_id,article_id' })
+                .then(({ error }) => { if (error) console.error('Score sync error:', error); });
+        }
+    }
 }
 
 // Fetch Open Graph image
@@ -1309,45 +1894,21 @@ function getScoreBadgeClass(score) {
 
 // ==================== SHARE ====================
 
-async function shareArticle(article) {
-    if (!article) return;
-    const summary = article.summary || article.groqSummary || '';
-    const score = articleScores[article.id];
-
-    const text = [
-        article.title,
-        '',
-        summary ? `AI Summary:\n${summary}` : '',
-        score ? `Relevance: ${score}/10` : '',
-        '',
-        article.link,
-        '',
-        'Shared via Weft (weft-web.vercel.app)'
-    ].filter(Boolean).join('\n');
-
-    if (navigator.share) {
-        try {
-            await navigator.share({ title: article.title, text: text, url: article.link });
-            return;
-        } catch (e) {
-            if (e.name === 'AbortError') return;
-        }
-    }
-
-    try {
-        await navigator.clipboard.writeText(text);
-        showToast('Copied to clipboard');
-    } catch (e) {
+function copyArticleLink(article) {
+    if (!article || !article.link) return;
+    navigator.clipboard.writeText(article.link).then(() => {
+        showToast('Link copied');
+    }).catch(() => {
         const ta = document.createElement('textarea');
-        ta.value = text;
+        ta.value = article.link;
         ta.style.position = 'fixed';
         ta.style.opacity = '0';
         document.body.appendChild(ta);
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        showToast('Copied to clipboard');
-    }
+        showToast('Link copied');
+    });
 }
 
 // ==================== DAILY BRIEFING ====================
@@ -1597,6 +2158,7 @@ function setupSidebarResize() {
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
         localStorage.setItem('sidebarWidth', parseInt(sidebar.style.width));
+        saveProfileToSupabase().catch(() => {});
     });
 }
 
@@ -1694,6 +2256,7 @@ function setupThemeToggle() {
         document.documentElement.setAttribute('data-theme', next);
         localStorage.setItem('theme', next);
         updateThemeIcon(next);
+        saveProfileToSupabase().catch(() => {});
     });
 }
 
