@@ -7,6 +7,15 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let _supabaseClient = null;
 let currentUser = null;
 
+// Capture ?ref= referral param immediately on page load
+(function captureRef() {
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref && /^[a-z0-9]{6,16}$/.test(ref)) {
+        localStorage.setItem('weft_ref', ref);
+        history.replaceState({}, '', window.location.pathname);
+    }
+})();
+
 // ==================== CATEGORIES & FEEDS ====================
 // Named content categories, each with curated RSS feeds.
 // DEFAULT_FEEDS is derived from this structure for backward compatibility.
@@ -350,8 +359,15 @@ function handleAuthStateChange(event, session) {
         updateAuthUI();
         // First login: push localStorage data to Supabase
         syncToSupabase();
-        loadFromSupabase();
+        loadFromSupabase().then(() => {
+            showOnboardingIfNeeded();
+        });
         showToast('Signed in');
+        // Track referral if user arrived via invite link
+        const storedRef = localStorage.getItem('weft_ref');
+        if (storedRef) {
+            trackReferral(storedRef, currentUser.id);
+        }
     } else if (event === 'SIGNED_OUT') {
         currentUser = null;
         updateAuthUI();
@@ -374,6 +390,120 @@ function updateAuthUI() {
         authBtn.title = 'Sign in';
         authBtn.classList.remove('authenticated');
     }
+
+    updateInviteSection();
+}
+
+// ==================== ONBOARDING ====================
+
+function showOnboardingIfNeeded() {
+    if (localStorage.getItem('onboarding_done') === 'true') return;
+    openOnboardingModal();
+}
+
+function openOnboardingModal() {
+    const modal = document.getElementById('onboardingModal');
+    if (!modal) return;
+    _onboardingGoToStep(1);
+    modal.classList.add('open');
+    _initOnboardingListeners();
+}
+
+function closeOnboardingModal() {
+    const modal = document.getElementById('onboardingModal');
+    if (modal) modal.classList.remove('open');
+}
+
+let _onboardingListenersInit = false;
+function _initOnboardingListeners() {
+    if (_onboardingListenersInit) return;
+    _onboardingListenersInit = true;
+
+    // Category toggle
+    document.querySelectorAll('.onboarding-cat-btn').forEach(btn => {
+        btn.addEventListener('click', () => btn.classList.toggle('selected'));
+    });
+
+    // Pace selection (single-select)
+    document.querySelectorAll('.onboarding-pace-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.onboarding-pace-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        });
+    });
+
+    // Step 1 → 2
+    document.getElementById('onboardingNextStep1').addEventListener('click', () => {
+        _onboardingGoToStep(2);
+    });
+
+    // Skip
+    document.getElementById('onboardingSkip').addEventListener('click', () => {
+        _finishOnboarding(true);
+    });
+
+    // Step 2 back
+    document.getElementById('onboardingBackStep2').addEventListener('click', () => {
+        _onboardingGoToStep(1);
+    });
+
+    // Step 2 → 3
+    document.getElementById('onboardingNextStep2').addEventListener('click', () => {
+        _onboardingApplyPreferences();
+        _onboardingGoToStep(3);
+    });
+
+    // Finish
+    document.getElementById('onboardingFinish').addEventListener('click', () => {
+        _finishOnboarding(false);
+    });
+}
+
+function _onboardingGoToStep(step) {
+    document.getElementById('onboardingStep1').style.display = step === 1 ? '' : 'none';
+    document.getElementById('onboardingStep2').style.display = step === 2 ? '' : 'none';
+    document.getElementById('onboardingStep3').style.display = step === 3 ? '' : 'none';
+    const bar = document.getElementById('onboardingProgressBar');
+    if (bar) bar.style.width = (step / 3 * 100) + '%';
+}
+
+function _onboardingApplyPreferences() {
+    // Apply category weights from selections
+    const selectedCats = Array.from(document.querySelectorAll('.onboarding-cat-btn.selected'))
+        .map(b => b.dataset.cat);
+
+    if (selectedCats.length > 0) {
+        const weights = {};
+        Object.keys(CATEGORIES).forEach(k => {
+            weights[k] = selectedCats.includes(k) ? 1.5 : 0.5;
+        });
+        settings.categoryWeights = weights;
+        localStorage.setItem('categoryWeights', JSON.stringify(weights));
+    }
+
+    // Apply reading pace → filterThreshold
+    const selectedPace = document.querySelector('.onboarding-pace-btn.selected');
+    const pace = selectedPace ? selectedPace.dataset.pace : 'balanced';
+    const thresholdMap = { quick: 7, balanced: 6, deep: 4 };
+    const threshold = thresholdMap[pace] || 6;
+    settings.filterThreshold = threshold;
+    localStorage.setItem('filterThreshold', threshold.toString());
+    localStorage.setItem('reading_pace', pace);
+
+    // Refresh article scores so new weights take effect
+    articleScores = {};
+    localStorage.removeItem('articleScores');
+}
+
+function _finishOnboarding(skipped) {
+    if (!skipped) {
+        // preferences already applied in step 2
+    }
+    localStorage.setItem('onboarding_done', 'true');
+    closeOnboardingModal();
+    saveProfileToSupabase().catch(() => {});
+    // Re-render article list with new preferences
+    renderArticles();
 }
 
 function openAuthModal() {
@@ -478,7 +608,9 @@ async function saveProfileToSupabase() {
         custom_feeds: customFeeds,
         category_weights: settings.categoryWeights,
         theme: localStorage.getItem('theme') || 'dark',
-        sidebar_width: parseInt(localStorage.getItem('sidebarWidth') || '400')
+        sidebar_width: parseInt(localStorage.getItem('sidebarWidth') || '400'),
+        onboarding_done: localStorage.getItem('onboarding_done') === 'true',
+        reading_pace: localStorage.getItem('reading_pace') || 'balanced'
     };
 
     const { error } = await _supabaseClient
@@ -550,6 +682,12 @@ async function loadProfileFromSupabase() {
             sidebar.style.minWidth = data.sidebar_width + 'px';
             document.documentElement.style.setProperty('--sidebar-width', data.sidebar_width + 'px');
         }
+    }
+    if (data.onboarding_done) {
+        localStorage.setItem('onboarding_done', 'true');
+    }
+    if (data.reading_pace) {
+        localStorage.setItem('reading_pace', data.reading_pace);
     }
 }
 
@@ -694,6 +832,7 @@ function setupEventListeners() {
     document.getElementById('authModal').addEventListener('click', (e) => {
         if (e.target === document.getElementById('authModal')) document.getElementById('authModal').classList.remove('open');
     });
+    // Onboarding modal — backdrop click does NOT close it (intentional: requires explicit choice)
     saveSettingsBtn.addEventListener('click', saveSettings);
     searchInput.addEventListener('input', handleSearch);
     searchInput.addEventListener('keydown', (e) => {
@@ -2048,13 +2187,81 @@ async function shareSummary() {
         }
 
         const { shareUrl } = await res.json();
-        await copyToClipboard(shareUrl);
-        showToast('Share link copied to clipboard!');
+        const shareTitle = currentArticle.title || 'Weft';
+        const shareText = (currentArticle.summary || '').slice(0, 180);
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+            } catch (shareErr) {
+                if (shareErr.name !== 'AbortError') {
+                    await copyToClipboard(shareUrl);
+                    showToast('Share link copied!');
+                }
+            }
+        } else {
+            await copyToClipboard(shareUrl);
+            showToast('Share link copied!');
+        }
     } catch (e) {
         console.error('Share error:', e);
         showToast('Could not create share link. Try again.');
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Share Summary`; }
+    }
+}
+
+// ==================== INVITE & REFERRAL ====================
+
+function getInviteLink() {
+    if (!currentUser) return null;
+    const refCode = currentUser.id.replace(/-/g, '').slice(0, 8);
+    return `${window.location.origin}?ref=${refCode}`;
+}
+
+async function copyInviteLink() {
+    const link = getInviteLink();
+    if (!link) {
+        showToast('Sign in to get your invite link');
+        return;
+    }
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Weft — AI-curated news',
+                text: 'Check out Weft — an AI news aggregator that actually filters the noise.',
+                url: link,
+            });
+            return;
+        } catch (e) {
+            if (e.name === 'AbortError') return;
+        }
+    }
+    await copyToClipboard(link);
+    showToast('Invite link copied!');
+}
+
+function updateInviteSection() {
+    const section = document.getElementById('inviteSection');
+    const input = document.getElementById('inviteLink');
+    if (!section || !input) return;
+    if (currentUser) {
+        section.style.display = '';
+        input.value = getInviteLink() || '';
+    } else {
+        section.style.display = 'none';
+    }
+}
+
+async function trackReferral(refCode, newUserId) {
+    try {
+        await fetch('/api/referral', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refCode, newUserId }),
+        });
+        localStorage.removeItem('weft_ref');
+    } catch {
+        // Silent fail — referral tracking is non-critical
     }
 }
 

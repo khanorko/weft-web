@@ -1810,3 +1810,204 @@ body {
     font-weight: 700;
     text-transform: uppercase;
 }
+
+/* ==================== ONBOARDING ==================== */
+.onboarding-modal-content {
+    max-width: 520px;
+    overflow: hidden;
+}
+
+.onboarding-progress {
+    height: 3px;
+    background: var(--border-subtle);
+    position: relative;
+}
+
+.onboarding-progress-bar {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.4s var(--ease-out);
+    width: 33%;
+}
+
+.onboarding-step {
+    padding: var(--space-xl) var(--space-xl) var(--space-lg);
+}
+
+.onboarding-header {
+    text-align: center;
+    margin-bottom: var(--space-xl);
+}
+
+.onboarding-logo {
+    font-family: var(--font-display);
+    font-size: 28px;
+    color: var(--accent);
+    margin-bottom: var(--space-md);
+}
+
+.onboarding-header h2 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 400;
+    margin-bottom: var(--space-sm);
+    color: var(--text-primary);
+}
+
+.onboarding-header p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.onboarding-categories {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xl);
+}
+
+.onboarding-cat-btn {
+    background: var(--bg-elevated);
+    border: 1.5px solid var(--border-default);
+    border-radius: 12px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 14px var(--space-md);
+    cursor: pointer;
+    transition: all 0.15s var(--ease-out);
+    text-align: left;
+}
+
+.onboarding-cat-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+}
+
+.onboarding-cat-btn.selected {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.onboarding-pace-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xl);
+}
+
+.onboarding-pace-btn {
+    background: var(--bg-elevated);
+    border: 1.5px solid var(--border-default);
+    border-radius: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    grid-template-rows: auto auto;
+    column-gap: var(--space-sm);
+    padding: var(--space-md);
+    text-align: left;
+    transition: all 0.15s var(--ease-out);
+}
+
+.onboarding-pace-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+}
+
+.onboarding-pace-btn.selected {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.pace-icon {
+    grid-row: 1 / 3;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+}
+
+.pace-label {
+    font-size: 14px;
+    font-weight: 600;
+    display: block;
+    color: inherit;
+}
+
+.pace-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 2px;
+}
+
+.onboarding-pace-btn.selected .pace-desc {
+    color: var(--text-secondary);
+}
+
+.onboarding-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.onboarding-actions .btn-primary {
+    width: 100%;
+}
+
+.onboarding-skip-btn,
+.onboarding-back-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    padding: var(--space-xs) 0;
+    text-align: center;
+    transition: color 0.15s;
+}
+
+.onboarding-skip-btn:hover,
+.onboarding-back-btn:hover {
+    color: var(--text-secondary);
+}
+
+.onboarding-done {
+    text-align: center;
+    padding: var(--space-md) 0 var(--space-sm);
+}
+
+.onboarding-done-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto var(--space-lg);
+}
+
+.onboarding-done h2 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 400;
+    margin-bottom: var(--space-sm);
+    color: var(--text-primary);
+}
+
+.onboarding-done p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: var(--space-lg);
+}

@@ -331,6 +331,15 @@
                     <button class="btn-secondary" id="saveAsNewStyle">Save As</button>
                 </div>
 
+                <div class="setting-group" id="inviteSection" style="display:none;">
+                    <label>Invite a friend</label>
+                    <div style="display:flex; gap:8px; margin-top:4px;">
+                        <input type="text" id="inviteLink" readonly style="flex:1; font-size:13px; cursor:default;" onclick="this.select()">
+                        <button class="btn-secondary" onclick="copyInviteLink()">Share</button>
+                    </div>
+                    <small>Friends who sign up via your link will be credited to you.</small>
+                </div>
+
                 <button class="btn-primary" id="saveSettings">Save Settings</button>
             </div>
         </div>
@@ -374,6 +383,77 @@
                     <div class="auth-sync-status" id="authSyncStatus">Synced</div>
                     <button class="btn-secondary" id="authSyncNowBtn" style="width: 100%; margin-bottom: 12px;">Sync now</button>
                     <button class="btn-secondary" id="authSignOutBtn" style="width: 100%; color: var(--danger);">Sign out</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onboarding Modal -->
+    <div class="modal" id="onboardingModal" role="dialog" aria-modal="true" aria-label="Welcome to Weft">
+        <div class="modal-content onboarding-modal-content">
+            <div class="onboarding-progress">
+                <div class="onboarding-progress-bar" id="onboardingProgressBar"></div>
+            </div>
+
+            <!-- Step 1: Categories -->
+            <div class="onboarding-step" id="onboardingStep1">
+                <div class="onboarding-header">
+                    <div class="onboarding-logo">Weft</div>
+                    <h2>What do you want to read?</h2>
+                    <p>Pick the topics you care about. We'll boost these in your feed.</p>
+                </div>
+                <div class="onboarding-categories" id="onboardingCategories">
+                    <button class="onboarding-cat-btn" data-cat="tech">💻 Tech &amp; AI</button>
+                    <button class="onboarding-cat-btn" data-cat="world">🌍 World</button>
+                    <button class="onboarding-cat-btn" data-cat="business">💼 Business</button>
+                    <button class="onboarding-cat-btn" data-cat="science">🔬 Science</button>
+                    <button class="onboarding-cat-btn" data-cat="politics">🏛️ Politics</button>
+                    <button class="onboarding-cat-btn" data-cat="sports">⚽ Sports</button>
+                    <button class="onboarding-cat-btn" data-cat="culture">🎭 Culture</button>
+                    <button class="onboarding-cat-btn" data-cat="design">🎨 Design &amp; UX</button>
+                </div>
+                <div class="onboarding-actions">
+                    <button class="btn-primary" id="onboardingNextStep1">Continue</button>
+                    <button class="onboarding-skip-btn" id="onboardingSkip">Skip setup</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Reading pace -->
+            <div class="onboarding-step" id="onboardingStep2" style="display:none;">
+                <div class="onboarding-header">
+                    <h2>How do you read?</h2>
+                    <p>This sets how many stories appear in your Smart feed.</p>
+                </div>
+                <div class="onboarding-pace-options" id="onboardingPaceOptions">
+                    <button class="onboarding-pace-btn" data-pace="quick">
+                        <span class="pace-icon">⚡</span>
+                        <span class="pace-label">Quick scan</span>
+                        <span class="pace-desc">Top stories only (score 7+)</span>
+                    </button>
+                    <button class="onboarding-pace-btn selected" data-pace="balanced">
+                        <span class="pace-icon">📰</span>
+                        <span class="pace-label">Balanced</span>
+                        <span class="pace-desc">Good mix of stories (score 6+)</span>
+                    </button>
+                    <button class="onboarding-pace-btn" data-pace="deep">
+                        <span class="pace-icon">🔭</span>
+                        <span class="pace-label">Deep dive</span>
+                        <span class="pace-desc">More stories, broader coverage (score 4+)</span>
+                    </button>
+                </div>
+                <div class="onboarding-actions">
+                    <button class="btn-primary" id="onboardingNextStep2">Continue</button>
+                    <button class="onboarding-back-btn" id="onboardingBackStep2">Back</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Done -->
+            <div class="onboarding-step" id="onboardingStep3" style="display:none;">
+                <div class="onboarding-done">
+                    <div class="onboarding-done-icon">✓</div>
+                    <h2>You're all set</h2>
+                    <p>Your feed is personalized. You can always adjust this in Settings.</p>
+                    <button class="btn-primary" id="onboardingFinish" style="width:100%; margin-top: 8px;">Start reading</button>
                 </div>
             </div>
         </div>
