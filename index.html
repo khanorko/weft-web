@@ -92,12 +92,20 @@
         .app { display: flex; height: 100vh; overflow: hidden; }
         .sidebar { width: 360px; flex-shrink: 0; }
         .loading-placeholder { display: flex; align-items: center; justify-content: center; height: 100vh; background: var(--bg); color: #555; font-family: -apple-system, sans-serif; font-size: 14px; }
+        /* Skip link — visually hidden until focused */
+        .skip-link { position: absolute; top: -100px; left: 8px; z-index: 10000; background: #7c6af7; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 14px; font-weight: 600; text-decoration: none; transition: top 0.1s; }
+        .skip-link:focus { top: 8px; outline: 3px solid #fff; outline-offset: 2px; }
+        /* Ensure focus rings are always visible */
+        :focus-visible { outline: 2px solid #7c6af7; outline-offset: 2px; }
     </style>
 </head>
 <body>
-    <div class="app">
+    <!-- Skip navigation link for keyboard/screen reader users -->
+    <a href="#articleContent" class="skip-link">Skip to main content</a>
+
+    <div class="app" role="application" aria-label="Weft news reader">
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" aria-label="News sidebar">
             <header class="sidebar-header">
                 <h1>Weft</h1>
                 <div class="header-actions">
@@ -154,20 +162,20 @@
                 <button class="cat-btn" data-category="design">🎨 Design</button>
             </nav>
 
-            <div class="article-list" id="articleList">
-                <div class="loading">Loading articles...</div>
+            <div class="article-list" id="articleList" role="list" aria-label="Article list" aria-live="polite" aria-atomic="false">
+                <div class="loading" role="status" aria-label="Loading articles">Loading articles...</div>
             </div>
 
             <footer class="sidebar-footer">
-                <span id="articleCount">0 articles</span>
+                <span id="articleCount" aria-live="polite">0 articles</span>
             </footer>
         </aside>
 
-        <div class="sidebar-resize-handle" id="sidebarResize"></div>
+        <div class="sidebar-resize-handle" id="sidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabindex="0"></div>
 
         <!-- Main Content -->
-        <main class="content" id="articleContent">
-            <button class="back-btn" id="backBtn" onclick="hideMobileContent()">
+        <main class="content" id="articleContent" tabindex="-1" aria-label="Article content">
+            <button class="back-btn" id="backBtn" onclick="hideMobileContent()" aria-label="Back to article list">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 Back
             </button>
@@ -186,7 +194,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Settings</h2>
-                <button class="close-btn" id="closeSettings">&times;</button>
+                <button class="close-btn" id="closeSettings" aria-label="Close settings">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="setting-group">
@@ -218,15 +226,15 @@
                     <small>Toggle sources on/off or add your own RSS feeds</small>
                 </div>
                 <div class="setting-group">
-                    <label>Smart Filter — Your Interests</label>
-                    <input type="text" id="filterInterests" placeholder="AI, machine learning, LLMs, tech industry">
-                    <small>Articles are scored 1-10 based on relevance to these topics</small>
+                    <label for="filterInterests">Smart Filter — Your Interests</label>
+                    <input type="text" id="filterInterests" placeholder="AI, machine learning, LLMs, tech industry" aria-describedby="filterInterestsHelp">
+                    <small id="filterInterestsHelp">Articles are scored 1-10 based on relevance to these topics</small>
                 </div>
                 <div class="setting-group">
-                    <label>Relevance Threshold</label>
+                    <label for="filterThreshold">Relevance Threshold</label>
                     <div style="display: flex; align-items: center; gap: 12px;">
-                        <input type="range" id="filterThreshold" min="1" max="10" value="6" style="flex: 1;">
-                        <span id="thresholdValue" style="color: var(--accent); font-weight: 600; min-width: 40px;">6/10</span>
+                        <input type="range" id="filterThreshold" min="1" max="10" value="6" style="flex: 1;" aria-valuemin="1" aria-valuemax="10" aria-valuenow="6" aria-label="Minimum relevance score">
+                        <span id="thresholdValue" aria-live="polite" style="color: var(--accent); font-weight: 600; min-width: 40px;">6/10</span>
                     </div>
                     <small>Only show articles with score ≥ this value in Smart filter</small>
                 </div>
@@ -407,7 +415,7 @@
         <div class="modal-content auth-modal-content">
             <div class="modal-header">
                 <h2 id="authModalTitle">Sign in</h2>
-                <button class="close-btn" id="closeAuth">&times;</button>
+                <button class="close-btn" id="closeAuth" aria-label="Close sign in dialog">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="authFormView">

@@ -1,14 +1,36 @@
+import { checkRateLimit, getClientIp, rejectIfLimited, cleanStore } from './_rate-limit.js';
+
 const ALLOWED_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
 ];
 
 const MAX_TOKENS_LIMIT = 4000;
+const RATE_LIMIT = 20;          // requests per window
+const RATE_WINDOW = 60 * 1000;  // 1 minute
 
 export default async function handler(req, res) {
+  // CORS — only allow same origin and the app domain
+  const origin = req.headers['origin'] || '';
+  const allowedOrigins = ['https://weft.news', 'https://weft-web.vercel.app'];
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Rate limiting: 20 LLM calls per IP per minute
+  const ip = getClientIp(req);
+  cleanStore('groq', RATE_WINDOW);
+  const rl = checkRateLimit('groq', ip, RATE_LIMIT, RATE_WINDOW);
+  if (rejectIfLimited(res, rl)) return;
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {

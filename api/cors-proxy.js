@@ -1,5 +1,9 @@
+import { checkRateLimit, getClientIp, rejectIfLimited, cleanStore } from './_rate-limit.js';
+
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB max response
 const MAX_REDIRECTS = 5;
+const RATE_LIMIT = 60;           // RSS fetches per window
+const RATE_WINDOW = 60 * 1000;   // 1 minute
 
 function isPrivateHostname(hostname) {
   return (
@@ -37,6 +41,12 @@ function validateUrl(urlStr) {
 }
 
 export default async function handler(req, res) {
+  // Rate limit: 60 feed fetches per IP per minute
+  const ip = getClientIp(req);
+  cleanStore('cors-proxy', RATE_WINDOW);
+  const rl = checkRateLimit('cors-proxy', ip, RATE_LIMIT, RATE_WINDOW);
+  if (rejectIfLimited(res, rl)) return;
+
   const url = req.query.url;
   if (!url) {
     return res.status(400).json({ error: 'Missing url parameter' });

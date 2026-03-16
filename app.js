@@ -1134,6 +1134,35 @@ function setupEventListeners() {
     // Onboarding modal — backdrop click does NOT close it (intentional: requires explicit choice)
     saveSettingsBtn.addEventListener('click', saveSettings);
 
+    // Global keyboard: Escape closes open modals, focus trapping
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (settingsModal.classList.contains('open')) {
+                settingsModal.classList.remove('open');
+                document.getElementById('settingsBtn').focus();
+            } else if (document.getElementById('authModal').classList.contains('open')) {
+                document.getElementById('authModal').classList.remove('open');
+                document.getElementById('authBtn').focus();
+            }
+        }
+        // Focus trap inside open modals
+        if (e.key === 'Tab') {
+            const openModal = document.querySelector('.modal.open');
+            if (!openModal) return;
+            const focusable = openModal.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"]), a[href]');
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    });
+
     // Push toggle button
     document.addEventListener('click', async e => {
         if (e.target && e.target.id === 'pushToggleBtn') {
@@ -1324,8 +1353,14 @@ function loadCustomStyles() {
 
 function openSettings() {
     settingsModal.classList.add('open');
+    settingsModal.setAttribute('aria-hidden', 'false');
     onStyleChange();
     renderFeedManager();
+    // Move focus into modal for accessibility
+    setTimeout(() => {
+        const first = settingsModal.querySelector('button, input, select, [tabindex]:not([tabindex="-1"])');
+        if (first) first.focus();
+    }, 50);
 }
 
 function onStyleChange() {
