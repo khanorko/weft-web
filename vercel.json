@@ -43,8 +43,23 @@
     { "source": "/api/cors-proxy", "destination": "/api/cors-proxy.js" },
     { "source": "/api/summary-cache", "destination": "/api/summary-cache.js" },
     { "source": "/api/share", "destination": "/api/share.js" },
+    { "source": "/api/briefing-generate", "destination": "/api/briefing-generate.js" },
+    { "source": "/api/referral", "destination": "/api/referral.js" },
+    { "source": "/api/email-digest", "destination": "/api/email-digest.js" },
+    { "source": "/api/unsubscribe", "destination": "/api/email-digest.js" },
     { "source": "/share", "destination": "/api/share.js" },
+    { "source": "/briefing/today", "destination": "/api/briefing.js?date=today" },
+    { "source": "/briefing/:date", "destination": "/api/briefing.js?date=:date" },
     { "source": "/app", "destination": "/index.html" },
     { "source": "/", "destination": "/landing.html" }
+  ],
+  "functions": {
+    "api/briefing-generate.js": { "maxDuration": 45 },
+    "api/briefing.js": { "maxDuration": 15 },
+    "api/email-digest.js": { "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/briefing-generate", "schedule": "0 7 * * *" },
+    { "path": "/api/email-digest", "schedule": "0 8 * * *" }
   ]
 }

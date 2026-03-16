@@ -245,7 +245,8 @@ let settings = {
     summaryStyle: localStorage.getItem('summaryStyle') || 'newsletter',
     filterInterests: localStorage.getItem('filterInterests') || 'AI, machine learning, LLMs, generative AI, tech industry',
     filterThreshold: parseInt(localStorage.getItem('filterThreshold') || '6'),
-    categoryWeights: JSON.parse(localStorage.getItem('categoryWeights') || '{}')
+    categoryWeights: JSON.parse(localStorage.getItem('categoryWeights') || '{}'),
+    emailDigest: localStorage.getItem('emailDigest') || 'off'
 };
 
 // Smart filter scores cache
@@ -687,7 +688,8 @@ async function saveProfileToSupabase() {
         theme: localStorage.getItem('theme') || 'dark',
         sidebar_width: parseInt(localStorage.getItem('sidebarWidth') || '400'),
         onboarding_done: localStorage.getItem('onboarding_done') === 'true',
-        reading_pace: localStorage.getItem('reading_pace') || 'balanced'
+        reading_pace: localStorage.getItem('reading_pace') || 'balanced',
+        email_digest: settings.emailDigest || 'off'
     };
 
     const { error } = await _supabaseClient
@@ -765,6 +767,10 @@ async function loadProfileFromSupabase() {
     }
     if (data.reading_pace) {
         localStorage.setItem('reading_pace', data.reading_pace);
+    }
+    if (data.email_digest) {
+        settings.emailDigest = data.email_digest;
+        localStorage.setItem('emailDigest', data.email_digest);
     }
     if (data.preference_vector && Object.keys(data.preference_vector).length > 0) {
         // Merge server vector with local (server may be more recent from another device)
@@ -1173,6 +1179,12 @@ function loadSettings() {
     document.getElementById('filterThreshold').addEventListener('input', (e) => {
         document.getElementById('thresholdValue').textContent = `${e.target.value}/10`;
     });
+
+    // Email digest (only visible when logged in)
+    const digestSelect = document.getElementById('emailDigest');
+    if (digestSelect) digestSelect.value = settings.emailDigest || 'off';
+    const digestSection = document.getElementById('emailDigestSection');
+    if (digestSection) digestSection.style.display = currentUser ? '' : 'none';
 }
 
 function saveSettings() {
@@ -1223,6 +1235,12 @@ function saveSettings() {
     localStorage.setItem('filterThreshold', settings.filterThreshold.toString());
     localStorage.setItem('summaryStyle', settings.summaryStyle);
     localStorage.setItem('categoryWeights', JSON.stringify(settings.categoryWeights));
+
+    const digestSelect = document.getElementById('emailDigest');
+    if (digestSelect) {
+        settings.emailDigest = digestSelect.value;
+        localStorage.setItem('emailDigest', settings.emailDigest);
+    }
 
     settingsModal.classList.remove('open');
 
@@ -2361,6 +2379,9 @@ function updateInviteSection() {
     } else {
         section.style.display = 'none';
     }
+
+    const digestSection = document.getElementById('emailDigestSection');
+    if (digestSection) digestSection.style.display = currentUser ? '' : 'none';
 }
 
 async function trackReferral(refCode, newUserId) {
