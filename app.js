@@ -1109,6 +1109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setupSidebarResize();
     setupThemeToggle();
+    setupStreakPanel();
 });
 
 function setupEventListeners() {
@@ -1898,6 +1899,7 @@ function renderArticles() {
     }).join('');
 
     articleCount.textContent = `${filtered.length} articles`;
+    updateStreakIndicator();
 }
 
 let searchDebounceTimer = null;
@@ -2986,6 +2988,154 @@ function getTopReadSources(limit) {
         .sort((a, b) => b[1] - a[1])
         .slice(0, limit)
         .map(([source]) => source);
+}
+
+// ==================== READING STREAKS & STATS (AIX-38) ====================
+
+function getReadingStreak() {
+    const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
+    const days = new Set(
+        Object.values(readTimes)
+            .filter(e => e && e.ts)
+            .map(e => new Date(e.ts).toISOString().slice(0, 10))
+    );
+    if (days.size === 0) return 0;
+    let streak = 0;
+    const today = new Date().toISOString().slice(0, 10);
+    let check = today;
+    while (days.has(check)) {
+        streak++;
+        const d = new Date(check + 'T12:00:00Z');
+        d.setUTCDate(d.getUTCDate() - 1);
+        check = d.toISOString().slice(0, 10);
+    }
+    return streak;
+}
+
+function getReadingStats() {
+    const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
+    const entries = Object.values(readTimes).filter(Boolean);
+
+    const now = Date.now();
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const weekAgoTs = now - 7 * 86400000;
+    const monthAgoTs = now - 30 * 86400000;
+
+    let todayCount = 0, weekCount = 0, monthCount = 0;
+    const catCounts = {};
+    const sourceCounts = {};
+
+    for (const e of entries) {
+        if (!e.ts) continue;
+        const d = new Date(e.ts).toISOString().slice(0, 10);
+        if (d === todayStr) todayCount++;
+        if (e.ts >= weekAgoTs) weekCount++;
+        if (e.ts >= monthAgoTs) {
+            monthCount++;
+            if (e.category) catCounts[e.category] = (catCounts[e.category] || 0) + 1;
+            if (e.source) sourceCounts[e.source] = (sourceCounts[e.source] || 0) + 1;
+        }
+    }
+
+    const topCategories = Object.entries(catCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([cat, n]) => ({ cat, n }));
+
+    const topSources = Object.entries(sourceCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([src, n]) => ({ src, n }));
+
+    return { todayCount, weekCount, monthCount, topCategories, topSources };
+}
+
+function renderStatsPanel() {
+    const body = document.getElementById('statsPanelBody');
+    if (!body) return;
+
+    const streak = getReadingStreak();
+    const { todayCount, weekCount, monthCount, topCategories, topSources } = getReadingStats();
+
+    const streakLabel = streak === 0 ? 'No streak yet' : streak === 1 ? '1 day streak' : `${streak} day streak`;
+    const streakEmoji = streak >= 7 ? '🔥' : streak >= 3 ? '⚡' : streak >= 1 ? '✨' : '📰';
+
+    const catsHtml = topCategories.length
+        ? topCategories.map(({ cat, n }) =>
+            `<div class="stats-row"><span>${cat}</span><span class="stats-val">${n}</span></div>`
+          ).join('')
+        : '<div class="stats-empty">No data yet</div>';
+
+    const srcHtml = topSources.length
+        ? topSources.map(({ src, n }) =>
+            `<div class="stats-row"><span>${src}</span><span class="stats-val">${n}</span></div>`
+          ).join('')
+        : '<div class="stats-empty">No data yet</div>';
+
+    body.innerHTML = `
+        <div class="stats-streak-hero">
+            <span class="stats-streak-emoji">${streakEmoji}</span>
+            <div class="stats-streak-label">${streakLabel}</div>
+        </div>
+        <div class="stats-grid">
+            <div class="stats-card"><div class="stats-num">${todayCount}</div><div class="stats-lbl">Today</div></div>
+            <div class="stats-card"><div class="stats-num">${weekCount}</div><div class="stats-lbl">This week</div></div>
+            <div class="stats-card"><div class="stats-num">${monthCount}</div><div class="stats-lbl">This month</div></div>
+        </div>
+        <div class="stats-section">
+            <div class="stats-section-title">Top categories (30d)</div>
+            ${catsHtml}
+        </div>
+        <div class="stats-section">
+            <div class="stats-section-title">Top sources (30d)</div>
+            ${srcHtml}
+        </div>
+    `;
+}
+
+function updateStreakIndicator() {
+    const btn = document.getElementById('streakBtn');
+    const icon = document.getElementById('streakIcon');
+    const count = document.getElementById('streakCount');
+    if (!btn) return;
+
+    const streak = getReadingStreak();
+    if (streak === 0) {
+        btn.style.display = 'none';
+        return;
+    }
+
+    btn.style.display = 'flex';
+    icon.textContent = streak >= 7 ? '🔥' : streak >= 3 ? '⚡' : '✨';
+    count.textContent = streak;
+    btn.title = `${streak} day reading streak`;
+    btn.setAttribute('aria-label', `Reading stats — ${streak} day streak`);
+}
+
+function setupStreakPanel() {
+    const btn = document.getElementById('streakBtn');
+    const panel = document.getElementById('statsPanel');
+    const closeBtn = document.getElementById('closeStats');
+    if (!btn || !panel) return;
+
+    btn.addEventListener('click', () => {
+        renderStatsPanel();
+        panel.style.display = 'flex';
+        closeBtn && closeBtn.focus();
+    });
+
+    closeBtn && closeBtn.addEventListener('click', () => {
+        panel.style.display = 'none';
+        btn.focus();
+    });
+
+    // Close on backdrop click
+    panel.addEventListener('click', (e) => {
+        if (e.target === panel) {
+            panel.style.display = 'none';
+            btn.focus();
+        }
+    });
 }
 
 // ==================== SIDEBAR RESIZE ====================

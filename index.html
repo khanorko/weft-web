@@ -168,7 +168,20 @@
 
             <footer class="sidebar-footer">
                 <span id="articleCount" aria-live="polite">0 articles</span>
+                <button class="streak-btn" id="streakBtn" title="Reading stats" aria-label="Reading stats" style="display:none;">
+                    <span id="streakIcon">🔥</span>
+                    <span id="streakCount"></span>
+                </button>
             </footer>
+
+            <!-- Stats modal -->
+            <div class="stats-panel" id="statsPanel" style="display:none;" role="dialog" aria-modal="true" aria-label="Reading statistics">
+                <div class="stats-panel-header">
+                    <h3>Reading Stats</h3>
+                    <button class="close-btn" id="closeStats" aria-label="Close stats">×</button>
+                </div>
+                <div class="stats-panel-body" id="statsPanelBody"></div>
+            </div>
         </aside>
 
         <div class="sidebar-resize-handle" id="sidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabindex="0"></div>
