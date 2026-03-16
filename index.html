@@ -350,6 +350,36 @@
                     <small>Personalized digest based on your category weights and interests.</small>
                 </div>
 
+                <div class="setting-group" id="pushNotificationSection" style="display:none;">
+                    <label>Push Notifications</label>
+                    <button class="btn-primary" id="pushToggleBtn">Enable notifications</button>
+                    <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 14px;">
+                            <input type="checkbox" id="pushBreaking" style="width: auto;" checked>
+                            Notify on breaking news
+                        </label>
+                        <div>
+                            <label style="font-size: 13px; text-transform: none; letter-spacing: 0;">
+                                Score threshold:
+                                <span id="pushThresholdValue" style="color: var(--accent); font-weight: 600;">9/10</span>
+                            </label>
+                            <input type="range" id="pushThreshold" min="7" max="10" value="9" style="width: 100%; margin-top: 4px;">
+                            <small>Only notify for articles scoring at or above this value</small>
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <div>
+                                <label style="font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--text-muted);">Quiet hours start</label>
+                                <input type="time" id="pushQuietStart" value="22:00" style="font-size: 13px; padding: 4px 6px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                            </div>
+                            <div>
+                                <label style="font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--text-muted);">Quiet hours end</label>
+                                <input type="time" id="pushQuietEnd" value="08:00" style="font-size: 13px; padding: 4px 6px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                            </div>
+                        </div>
+                    </div>
+                    <small>Breaking news and top stories delivered instantly to your browser.</small>
+                </div>
+
                 <button class="btn-primary" id="saveSettings">Save Settings</button>
             </div>
         </div>
@@ -463,6 +493,16 @@
                     <div class="onboarding-done-icon">✓</div>
                     <h2>You're all set</h2>
                     <p>Your feed is personalized. You can always adjust this in Settings.</p>
+
+                    <div id="onboardingPushSection" style="display:none; margin: 16px 0; padding: 16px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border); text-align: left;">
+                        <p style="margin: 0 0 8px; font-weight: 600; font-size: 14px;">Get breaking news alerts?</p>
+                        <p style="margin: 0 0 12px; font-size: 13px; color: var(--text-muted);">Be notified when trending stories score above your threshold.</p>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-primary" style="flex: 1;" onclick="enablePushNotifications().then(() => document.getElementById('onboardingPushSection').style.display='none')">Yes, notify me</button>
+                            <button class="btn-secondary" style="flex: 1;" onclick="document.getElementById('onboardingPushSection').style.display='none'">Maybe later</button>
+                        </div>
+                    </div>
+
                     <button class="btn-primary" id="onboardingFinish" style="width:100%; margin-top: 8px;">Start reading</button>
                 </div>
             </div>

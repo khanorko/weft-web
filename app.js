@@ -246,7 +246,11 @@ let settings = {
     filterInterests: localStorage.getItem('filterInterests') || 'AI, machine learning, LLMs, generative AI, tech industry',
     filterThreshold: parseInt(localStorage.getItem('filterThreshold') || '6'),
     categoryWeights: JSON.parse(localStorage.getItem('categoryWeights') || '{}'),
-    emailDigest: localStorage.getItem('emailDigest') || 'off'
+    emailDigest: localStorage.getItem('emailDigest') || 'off',
+    pushBreaking: localStorage.getItem('pushBreaking') !== 'false',
+    pushThreshold: parseInt(localStorage.getItem('pushThreshold') || '9'),
+    pushQuietStart: localStorage.getItem('pushQuietStart') || '22:00',
+    pushQuietEnd: localStorage.getItem('pushQuietEnd') || '08:00',
 };
 
 // Smart filter scores cache
@@ -461,6 +465,182 @@ function updateAuthUI() {
     updateInviteSection();
 }
 
+// ==================== PUSH NOTIFICATIONS ====================
+
+// Public VAPID key — generated for weft.news
+const VAPID_PUBLIC_KEY = 'BKHHgUQTXtYlkdWaekZcGGWcSWm3ZzwKBH7NWFwlVMGOyaHX0yNm8pcF7RaN0ymmuYu2s2HStJrvJ-l8LSNWx50';
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+function isInQuietHours() {
+    const [startH, startM] = settings.pushQuietStart.split(':').map(Number);
+    const [endH, endM] = settings.pushQuietEnd.split(':').map(Number);
+    const now = new Date();
+    const cur = now.getHours() * 60 + now.getMinutes();
+    const start = startH * 60 + startM;
+    const end = endH * 60 + endM;
+    if (start <= end) return cur >= start && cur < end;
+    return cur >= start || cur < end; // overnight range
+}
+
+async function getPushRegistration() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+    return navigator.serviceWorker.ready;
+}
+
+async function subscribeToPush() {
+    const reg = await getPushRegistration();
+    if (!reg) return null;
+    try {
+        const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+        return sub;
+    } catch (err) {
+        console.warn('Push subscribe failed:', err);
+        return null;
+    }
+}
+
+async function enablePushNotifications() {
+    if (!('Notification' in window)) {
+        showToast('Push notifications not supported in this browser.', 'error');
+        return false;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+        showToast('Notification permission denied.', 'warning');
+        return false;
+    }
+
+    const sub = await subscribeToPush();
+    if (!sub) {
+        showToast('Failed to subscribe to push notifications.', 'error');
+        return false;
+    }
+
+    // Save subscription to server (only if logged in)
+    const session = await supabaseClient?.auth?.getSession?.();
+    const jwt = session?.data?.session?.access_token;
+    if (jwt) {
+        try {
+            await fetch('/api/push-subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}` },
+                body: JSON.stringify({ subscription: sub.toJSON() }),
+            });
+        } catch (e) {
+            console.warn('Failed to save push subscription server-side:', e);
+        }
+    }
+
+    localStorage.setItem('pushEnabled', 'true');
+    localStorage.setItem('pushSubscription', JSON.stringify(sub.toJSON()));
+    showToast('Push notifications enabled.', 'success');
+    return true;
+}
+
+async function disablePushNotifications() {
+    const reg = await getPushRegistration();
+    if (reg) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+            const session = await supabaseClient?.auth?.getSession?.();
+            const jwt = session?.data?.session?.access_token;
+            if (jwt) {
+                await fetch('/api/push-subscribe', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}` },
+                    body: JSON.stringify({ endpoint: sub.endpoint }),
+                }).catch(() => {});
+            }
+            await sub.unsubscribe().catch(() => {});
+        }
+    }
+    localStorage.removeItem('pushEnabled');
+    localStorage.removeItem('pushSubscription');
+    showToast('Push notifications disabled.', 'success');
+}
+
+// Called after each feed refresh to notify about breaking/high-score articles
+async function maybeSendPushNotifications(articles) {
+    if (!localStorage.getItem('pushEnabled')) return;
+    if (isInQuietHours()) return;
+    if (!articles?.length) return;
+
+    // Check if we recently sent a notification (throttle to max 1/hour)
+    const lastNotify = parseInt(localStorage.getItem('lastPushNotify') || '0');
+    if (Date.now() - lastNotify < 60 * 60 * 1000) return;
+
+    // Collect candidates: breaking news + articles above push threshold
+    const candidates = articles.filter(a => {
+        const meta = trendingMeta[a.id] || {};
+        const isBreaking = meta.breaking && settings.pushBreaking;
+        const isHighScore = (articleScores[a.id] || 0) >= settings.pushThreshold;
+        return isBreaking || isHighScore;
+    }).map(a => {
+        const meta = trendingMeta[a.id] || {};
+        return {
+            title: a.title,
+            url: a.url,
+            source: a.source,
+            score: articleScores[a.id] || 0,
+            isBreaking: !!meta.breaking,
+            category: a.category,
+        };
+    });
+
+    if (!candidates.length) return;
+
+    const session = await supabaseClient?.auth?.getSession?.();
+    const jwt = session?.data?.session?.access_token;
+
+    if (jwt) {
+        // Server-side push (works when tab is in background)
+        try {
+            await fetch('/api/push-notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}` },
+                body: JSON.stringify({ articles: candidates }),
+            });
+            localStorage.setItem('lastPushNotify', Date.now().toString());
+        } catch (e) {
+            console.warn('Push notify failed:', e);
+        }
+    } else {
+        // Fallback: local notification (requires SW, works in foreground)
+        const reg = await getPushRegistration().catch(() => null);
+        if (reg && Notification.permission === 'granted') {
+            const top = candidates.sort((a, b) => b.isBreaking - a.isBreaking || b.score - a.score)[0];
+            const title = top.isBreaking ? `Breaking: ${top.title}` : top.title;
+            reg.showNotification(title, {
+                body: top.source ? `via ${top.source}` : 'Weft News',
+                icon: '/icon-192.png',
+                badge: '/icon-192.png',
+                tag: top.isBreaking ? 'breaking' : 'top-story',
+                data: { url: top.url },
+            });
+            localStorage.setItem('lastPushNotify', Date.now().toString());
+        }
+    }
+}
+
+// Handle notification click → navigate to article URL
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data?.type === 'OPEN_URL' && event.data.url) {
+            window.open(event.data.url, '_blank', 'noopener');
+        }
+    });
+}
+
 // ==================== ONBOARDING ====================
 
 function showOnboardingIfNeeded() {
@@ -518,6 +698,13 @@ function _initOnboardingListeners() {
     document.getElementById('onboardingNextStep2').addEventListener('click', () => {
         _onboardingApplyPreferences();
         _onboardingGoToStep(3);
+        // Show push permission prompt in step 3 if supported
+        const pushOnboardingSection = document.getElementById('onboardingPushSection');
+        if (pushOnboardingSection) {
+            pushOnboardingSection.style.display =
+                ('Notification' in window && 'PushManager' in window && Notification.permission === 'default')
+                    ? '' : 'none';
+        }
     });
 
     // Finish
@@ -689,7 +876,11 @@ async function saveProfileToSupabase() {
         sidebar_width: parseInt(localStorage.getItem('sidebarWidth') || '400'),
         onboarding_done: localStorage.getItem('onboarding_done') === 'true',
         reading_pace: localStorage.getItem('reading_pace') || 'balanced',
-        email_digest: settings.emailDigest || 'off'
+        email_digest: settings.emailDigest || 'off',
+        push_breaking: settings.pushBreaking,
+        push_threshold: settings.pushThreshold,
+        push_quiet_start: settings.pushQuietStart,
+        push_quiet_end: settings.pushQuietEnd,
     };
 
     const { error } = await _supabaseClient
@@ -771,6 +962,22 @@ async function loadProfileFromSupabase() {
     if (data.email_digest) {
         settings.emailDigest = data.email_digest;
         localStorage.setItem('emailDigest', data.email_digest);
+    }
+    if (data.push_breaking !== undefined && data.push_breaking !== null) {
+        settings.pushBreaking = data.push_breaking;
+        localStorage.setItem('pushBreaking', data.push_breaking.toString());
+    }
+    if (data.push_threshold) {
+        settings.pushThreshold = data.push_threshold;
+        localStorage.setItem('pushThreshold', data.push_threshold.toString());
+    }
+    if (data.push_quiet_start) {
+        settings.pushQuietStart = data.push_quiet_start;
+        localStorage.setItem('pushQuietStart', data.push_quiet_start);
+    }
+    if (data.push_quiet_end) {
+        settings.pushQuietEnd = data.push_quiet_end;
+        localStorage.setItem('pushQuietEnd', data.push_quiet_end);
     }
     if (data.preference_vector && Object.keys(data.preference_vector).length > 0) {
         // Merge server vector with local (server may be more recent from another device)
@@ -926,6 +1133,36 @@ function setupEventListeners() {
     });
     // Onboarding modal — backdrop click does NOT close it (intentional: requires explicit choice)
     saveSettingsBtn.addEventListener('click', saveSettings);
+
+    // Push toggle button
+    document.addEventListener('click', async e => {
+        if (e.target && e.target.id === 'pushToggleBtn') {
+            const enabled = !!localStorage.getItem('pushEnabled');
+            if (enabled) {
+                await disablePushNotifications();
+            } else {
+                await enablePushNotifications();
+            }
+            // Refresh button state
+            const pushToggle = document.getElementById('pushToggleBtn');
+            if (pushToggle) {
+                const nowEnabled = !!localStorage.getItem('pushEnabled');
+                pushToggle.textContent = nowEnabled ? 'Disable notifications' : 'Enable notifications';
+                pushToggle.classList.toggle('btn-secondary', nowEnabled);
+                pushToggle.classList.toggle('btn-primary', !nowEnabled);
+            }
+        }
+    });
+
+    // Push threshold slider live update
+    const pushThresholdSlider = document.getElementById('pushThreshold');
+    if (pushThresholdSlider) {
+        pushThresholdSlider.addEventListener('input', e => {
+            const val = document.getElementById('pushThresholdValue');
+            if (val) val.textContent = `${e.target.value}/10`;
+        });
+    }
+
     searchInput.addEventListener('input', handleSearch);
     searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') handleSearch();
@@ -1185,6 +1422,33 @@ function loadSettings() {
     if (digestSelect) digestSelect.value = settings.emailDigest || 'off';
     const digestSection = document.getElementById('emailDigestSection');
     if (digestSection) digestSection.style.display = currentUser ? '' : 'none';
+
+    // Push notification settings
+    const pushSection = document.getElementById('pushNotificationSection');
+    if (pushSection) {
+        const pushBreakingEl = document.getElementById('pushBreaking');
+        const pushThresholdEl = document.getElementById('pushThreshold');
+        const pushThresholdVal = document.getElementById('pushThresholdValue');
+        const pushQuietStartEl = document.getElementById('pushQuietStart');
+        const pushQuietEndEl = document.getElementById('pushQuietEnd');
+        if (pushBreakingEl) pushBreakingEl.checked = settings.pushBreaking;
+        if (pushThresholdEl) pushThresholdEl.value = settings.pushThreshold;
+        if (pushThresholdVal) pushThresholdVal.textContent = `${settings.pushThreshold}/10`;
+        if (pushQuietStartEl) pushQuietStartEl.value = settings.pushQuietStart;
+        if (pushQuietEndEl) pushQuietEndEl.value = settings.pushQuietEnd;
+
+        // Update toggle button state
+        const pushEnabled = !!localStorage.getItem('pushEnabled');
+        const pushToggle = document.getElementById('pushToggleBtn');
+        if (pushToggle) {
+            pushToggle.textContent = pushEnabled ? 'Disable notifications' : 'Enable notifications';
+            pushToggle.classList.toggle('btn-secondary', pushEnabled);
+            pushToggle.classList.toggle('btn-primary', !pushEnabled);
+        }
+
+        const supported = 'Notification' in window && 'PushManager' in window;
+        pushSection.style.display = supported ? '' : 'none';
+    }
 }
 
 function saveSettings() {
@@ -1240,6 +1504,28 @@ function saveSettings() {
     if (digestSelect) {
         settings.emailDigest = digestSelect.value;
         localStorage.setItem('emailDigest', settings.emailDigest);
+    }
+
+    // Push notification settings
+    const pushBreakingEl = document.getElementById('pushBreaking');
+    const pushThresholdEl = document.getElementById('pushThreshold');
+    const pushQuietStartEl = document.getElementById('pushQuietStart');
+    const pushQuietEndEl = document.getElementById('pushQuietEnd');
+    if (pushBreakingEl) {
+        settings.pushBreaking = pushBreakingEl.checked;
+        localStorage.setItem('pushBreaking', settings.pushBreaking.toString());
+    }
+    if (pushThresholdEl) {
+        settings.pushThreshold = parseInt(pushThresholdEl.value);
+        localStorage.setItem('pushThreshold', settings.pushThreshold.toString());
+    }
+    if (pushQuietStartEl) {
+        settings.pushQuietStart = pushQuietStartEl.value;
+        localStorage.setItem('pushQuietStart', settings.pushQuietStart);
+    }
+    if (pushQuietEndEl) {
+        settings.pushQuietEnd = pushQuietEndEl.value;
+        localStorage.setItem('pushQuietEnd', settings.pushQuietEnd);
     }
 
     settingsModal.classList.remove('open');
@@ -1298,9 +1584,12 @@ async function loadArticles(forceRefresh = false) {
         computeTrendingAndBreaking(articles);
 
         renderArticles();
-        
+
         // Run smart filter in background
         runSmartFilter();
+
+        // Maybe send push notification for breaking/high-score articles
+        maybeSendPushNotifications(articles);
     } catch (error) {
         articleList.innerHTML = '<div class="loading">Error loading articles. Try again.</div>';
         console.error(error);

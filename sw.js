@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weft-v2.1';
+const CACHE_NAME = 'weft-v2.2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -53,5 +53,51 @@ self.addEventListener('fetch', event => {
       }
       return response;
     }).catch(() => caches.match(event.request))
+  );
+});
+
+// ─── Push notifications ───────────────────────────────────────────────────────
+
+// Receive push from server and show notification
+self.addEventListener('push', event => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: 'Weft', body: event.data ? event.data.text() : '' };
+  }
+
+  const options = {
+    body: data.body || '',
+    icon: data.icon || '/icon-192.png',
+    badge: data.badge || '/icon-192.png',
+    tag: data.tag || 'weft-news',
+    data: { url: data.url || '/' },
+    requireInteraction: false,
+    silent: false,
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Weft News', options)
+  );
+});
+
+// Open article URL when notification is clicked
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      // Focus existing tab if open
+      for (const client of clients) {
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          client.focus();
+          client.postMessage({ type: 'OPEN_URL', url });
+          return;
+        }
+      }
+      // Otherwise open new tab
+      self.clients.openWindow(url);
+    })
   );
 });
