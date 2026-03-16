@@ -251,6 +251,72 @@ let settings = {
 // Smart filter scores cache
 let articleScores = JSON.parse(localStorage.getItem('articleScores') || '{}');
 
+// ─── Preference Vector ─────────────────────────────────────────────────────────
+// Builds a decayed preference model from all available signals:
+//   - Onboarding category weights (baseline)
+//   - Read times with time-decay (implicit)
+//   - Likes / dislikes / bookmarks (explicit)
+// Half-life: 30 days — interests decay naturally over time.
+function buildPreferenceVector() {
+    const now = Date.now();
+    const HALF_LIFE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+    const K = Math.log(2) / HALF_LIFE_MS;
+    const decay = (ts) => ts ? Math.exp(-K * Math.max(0, now - ts)) : 1;
+
+    const sources = {};
+    const keywords = {};
+    const categories = {};
+
+    // 1. Onboarding category weights as baseline (no decay — explicit user choice)
+    const catWeights = settings.categoryWeights || {};
+    Object.entries(catWeights).forEach(([cat, w]) => {
+        const signal = (w - 1.0) * 0.5; // normalize: 1.5→+0.25, 0.5→-0.25
+        if (signal !== 0) categories[cat] = (categories[cat] || 0) + signal;
+    });
+
+    // 2. Read times — implicit signal, decayed by age
+    const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
+    Object.values(readTimes).forEach(e => {
+        const w = Math.min(e.seconds / 60, 2.0) * decay(e.ts); // cap at 2 min
+        if (e.source) sources[e.source] = (sources[e.source] || 0) + w;
+        if (e.category) categories[e.category] = (categories[e.category] || 0) + w;
+        (e.keywords || []).forEach(kw => {
+            keywords[kw] = (keywords[kw] || 0) + w * 0.3;
+        });
+    });
+
+    // 3. Explicit signals: like +2, bookmark +1.5, dislike -1.5
+    const localArticles = JSON.parse(localStorage.getItem('articles') || '[]');
+    localArticles.forEach(a => {
+        if (!a.liked && !a.disliked && !a.bookmarked) return;
+        const ts = a.ts || (a.date ? Date.parse(a.date) : null);
+        const d = decay(ts);
+        let signal = 0;
+        if (a.liked) signal = 2.0 * d;
+        else if (a.disliked) signal = -1.5 * d;
+        else if (a.bookmarked) signal = 1.5 * d;
+        if (a.source) sources[a.source] = (sources[a.source] || 0) + signal;
+        if (a.category) categories[a.category] = (categories[a.category] || 0) + signal;
+        if (signal > 0) {
+            (a.keywords || []).forEach(kw => {
+                keywords[kw] = (keywords[kw] || 0) + signal * 0.4;
+            });
+        }
+    });
+
+    // Keep top N by absolute value
+    const topN = (obj, n) => Object.fromEntries(
+        Object.entries(obj).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, n)
+    );
+
+    return {
+        sources: topN(sources, 20),
+        keywords: topN(keywords, 30),
+        categories: topN(categories, 10),
+        updatedAt: now
+    };
+}
+
 // Trending detection cache
 let trendingMeta = {}; // articleId -> { trending, breaking, groupSize, groupKeyword }
 
@@ -594,6 +660,17 @@ async function loadFromSupabase() {
     }
 }
 
+async function savePreferenceVector() {
+    const vector = buildPreferenceVector();
+    localStorage.setItem('preferenceVector', JSON.stringify(vector));
+    if (!_supabaseClient || !currentUser) return;
+    const { error } = await _supabaseClient
+        .from('profiles')
+        .update({ preference_vector: vector })
+        .eq('id', currentUser.id);
+    if (error) console.error('Save preference vector error:', error);
+}
+
 async function saveProfileToSupabase() {
     if (!_supabaseClient || !currentUser) return;
     const profile = {
@@ -688,6 +765,15 @@ async function loadProfileFromSupabase() {
     }
     if (data.reading_pace) {
         localStorage.setItem('reading_pace', data.reading_pace);
+    }
+    if (data.preference_vector && Object.keys(data.preference_vector).length > 0) {
+        // Merge server vector with local (server may be more recent from another device)
+        const local = JSON.parse(localStorage.getItem('preferenceVector') || '{}');
+        const serverTs = data.preference_vector.updatedAt || 0;
+        const localTs = local.updatedAt || 0;
+        if (serverTs > localTs) {
+            localStorage.setItem('preferenceVector', JSON.stringify(data.preference_vector));
+        }
     }
 }
 
@@ -1568,6 +1654,16 @@ function filterArticles() {
 }
 
 let articleViewStart = null;
+let articleMaxScrollPct = 0; // 0–100, max scroll depth for current article
+
+function _onArticleScroll() {
+    const el = articleContent;
+    const scrollable = el.scrollHeight - el.clientHeight;
+    if (scrollable > 0) {
+        const pct = Math.round((el.scrollTop / scrollable) * 100);
+        if (pct > articleMaxScrollPct) articleMaxScrollPct = pct;
+    }
+}
 
 function trackReadTime() {
     if (currentArticle && articleViewStart) {
@@ -1577,6 +1673,7 @@ function trackReadTime() {
             const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
             readTimes[currentArticle.id] = {
                 seconds: duration,
+                scrollDepth: articleMaxScrollPct,
                 source: currentArticle.source,
                 category: currentArticle.category || null,
                 keywords: currentArticle.keywords || [],
@@ -1587,16 +1684,24 @@ function trackReadTime() {
             // Sync to Supabase (fire-and-forget)
             saveInteractionToSupabase(currentArticle.id, {
                 read: true,
-                read_duration_seconds: duration
+                read_duration_seconds: duration,
+                scroll_depth_pct: articleMaxScrollPct
             }).catch(() => {});
+
+            // Rebuild preference vector after meaningful read
+            if (duration >= 30 || articleMaxScrollPct >= 50) {
+                savePreferenceVector().catch(() => {});
+            }
         }
     }
+    articleMaxScrollPct = 0;
 }
 
 function showArticle(article) {
     // Track time spent on previous article
     trackReadTime();
     articleViewStart = performance.now();
+    articleMaxScrollPct = 0;
 
     currentArticle = article;
     article.read = true;
@@ -1608,6 +1713,10 @@ function showArticle(article) {
     document.querySelectorAll('.article-item').forEach(item => {
         item.classList.toggle('active', item.dataset.id === article.id);
     });
+
+    // Track scroll depth for this article
+    articleContent.removeEventListener('scroll', _onArticleScroll);
+    articleContent.addEventListener('scroll', _onArticleScroll, { passive: true });
 
     const score = articleScores[article.id];
     const backBtn = document.getElementById('backBtn');
@@ -1782,6 +1891,7 @@ function toggleLike(id) {
         localStorage.setItem('articles', JSON.stringify(articles));
         showArticle(article);
         saveInteractionToSupabase(id, { liked: article.liked, disliked: article.disliked }).catch(() => {});
+        savePreferenceVector().catch(() => {});
     }
 }
 
@@ -1793,6 +1903,7 @@ function toggleDislike(id) {
         localStorage.setItem('articles', JSON.stringify(articles));
         showArticle(article);
         saveInteractionToSupabase(id, { disliked: article.disliked, liked: article.liked }).catch(() => {});
+        savePreferenceVector().catch(() => {});
     }
 }
 
@@ -1805,6 +1916,7 @@ function toggleBookmark(id) {
         showArticle(article);
         renderArticles();
         saveInteractionToSupabase(id, { bookmarked: article.bookmarked }).catch(() => {});
+        savePreferenceVector().catch(() => {});
     }
 }
 
@@ -2015,32 +2127,30 @@ async function scoreBatch(batch) {
         return `[${i}] ${a.title} (${a.source})${catLabel ? ` — ${catLabel}` : ''}`;
     }).join('\n');
 
-    // Build preference context from implicit feedback
+    // Build preference context from learned preference vector
+    const prefVec = buildPreferenceVector();
     let prefContext = '';
-    const readTimes = JSON.parse(localStorage.getItem('readTimes') || '{}');
-    const entries = Object.values(readTimes);
-    if (entries.length >= 5) {
-        const engaged = entries.filter(e => e.seconds >= 30);
-        const sourceCounts = {};
-        const kwCounts = {};
-        const catCounts = {};
-        engaged.forEach(e => {
-            sourceCounts[e.source] = (sourceCounts[e.source] || 0) + 1;
-            (e.keywords || []).forEach(k => { kwCounts[k] = (kwCounts[k] || 0) + 1; });
-            if (e.category) catCounts[e.category] = (catCounts[e.category] || 0) + 1;
-        });
-        const topSources = Object.entries(sourceCounts).sort((a,b) => b[1]-a[1]).slice(0,3).map(e => e[0]);
-        const topKw = Object.entries(kwCounts).sort((a,b) => b[1]-a[1]).slice(0,5).map(e => e[0]);
-        const topCats = Object.entries(catCounts).sort((a,b) => b[1]-a[1]).slice(0,3)
-            .map(([k]) => CATEGORIES[k]?.label || k);
-        if (topSources.length > 0) {
-            prefContext = `\nUser reading patterns: prefers ${topSources.join(', ')}. Frequent topics: ${topKw.join(', ')}.${topCats.length > 0 ? ` Most-read categories: ${topCats.join(', ')}.` : ''} Boost these slightly (max +1).`;
-        }
-    }
 
-    // Build category weight context
-    const weights = settings.categoryWeights || {};
-    const weightLines = Object.entries(weights)
+    const posSources = Object.entries(prefVec.sources)
+        .filter(([, v]) => v > 0.3).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([s]) => s);
+    const negSources = Object.entries(prefVec.sources)
+        .filter(([, v]) => v < -0.3).sort((a, b) => a[1] - b[1]).slice(0, 3).map(([s]) => s);
+    const posKw = Object.entries(prefVec.keywords)
+        .filter(([, v]) => v > 0.2).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k]) => k);
+
+    const ctxParts = [];
+    if (posSources.length > 0) ctxParts.push(`prefers sources: ${posSources.join(', ')}`);
+    if (posKw.length > 0) ctxParts.push(`interested in topics: ${posKw.join(', ')}`);
+    if (negSources.length > 0) ctxParts.push(`less interested in sources: ${negSources.join(', ')}`);
+    if (ctxParts.length > 0) prefContext = `\nLearned user preferences: ${ctxParts.join('. ')}.`;
+
+    // Build category weight context — blend onboarding + learned signals
+    const blendedWeights = { ...(settings.categoryWeights || {}) };
+    Object.entries(prefVec.categories).forEach(([cat, score]) => {
+        if (score > 0.3) blendedWeights[cat] = Math.min(2.0, (blendedWeights[cat] || 1.0) + score * 0.2);
+        else if (score < -0.3) blendedWeights[cat] = Math.max(0.3, (blendedWeights[cat] || 1.0) + score * 0.15);
+    });
+    const weightLines = Object.entries(blendedWeights)
         .filter(([k, v]) => v !== 1.0 && CATEGORIES[k])
         .map(([k, v]) => `${CATEGORIES[k].label}: ${v >= 1.5 ? 'High priority' : v >= 1.0 ? 'Normal' : 'Low priority'}`);
     const catWeightContext = weightLines.length > 0
@@ -2070,7 +2180,8 @@ Respond with ONLY valid JSON.`;
     result.articles.forEach(scored => {
         const article = batch[scored.i];
         if (article) {
-            const weight = (settings.categoryWeights || {})[article.category] ?? 1.0;
+            // Use blended weights (onboarding + learned) for post-scoring adjustment
+            const weight = blendedWeights[article.category] ?? 1.0;
             const weightedScore = Math.min(10, Math.max(1, Math.round(scored.s * weight)));
             articleScores[article.id] = weightedScore;
             article.groqSummary = scored.t;
