@@ -1664,11 +1664,36 @@ function loadSettings() {
 
     const useOwnKeyCheckbox = document.getElementById('useOwnKey');
     const ownKeyGroup = document.getElementById('ownKeyGroup');
+    const ownKeyCheckboxGroup = document.getElementById('ownKeyCheckboxGroup');
+    const llmProviderSelect = document.getElementById('llmProvider');
+
+    const providerConfig = {
+        groq: { label: 'Your Groq API Key', placeholder: 'gsk_...', help: 'Get a free key at console.groq.com', hasBuiltIn: true },
+        openai: { label: 'Your OpenAI API Key', placeholder: 'sk-...', help: 'Get a key at platform.openai.com', hasBuiltIn: false },
+        anthropic: { label: 'Your Anthropic API Key', placeholder: 'sk-ant-...', help: 'Get a key at console.anthropic.com', hasBuiltIn: false }
+    };
+
+    function updateKeyUI() {
+        const provider = llmProviderSelect.value;
+        const cfg = providerConfig[provider] || providerConfig.groq;
+        document.getElementById('apiKeyLabel').textContent = cfg.label;
+        document.getElementById('apiKey').placeholder = cfg.placeholder;
+        document.getElementById('apiKeyHelp').textContent = cfg.help;
+
+        if (cfg.hasBuiltIn) {
+            ownKeyCheckboxGroup.style.display = '';
+            ownKeyGroup.style.display = useOwnKeyCheckbox.checked ? '' : 'none';
+        } else {
+            ownKeyCheckboxGroup.style.display = 'none';
+            ownKeyGroup.style.display = '';
+        }
+    }
+
     useOwnKeyCheckbox.checked = settings.useOwnKey;
-    ownKeyGroup.style.display = settings.useOwnKey ? '' : 'none';
-    useOwnKeyCheckbox.addEventListener('change', () => {
-        ownKeyGroup.style.display = useOwnKeyCheckbox.checked ? '' : 'none';
-    });
+    updateKeyUI();
+
+    useOwnKeyCheckbox.addEventListener('change', updateKeyUI);
+    llmProviderSelect.addEventListener('change', updateKeyUI);
 
     // Setup threshold slider
     document.getElementById('filterThreshold').addEventListener('input', (e) => {
@@ -2628,8 +2653,9 @@ async function callLLM(prompt, options = {}) {
     const maxTokens = options.max_tokens || 400;
     const temperature = options.temperature;
 
-    // Use proxy (shared key) unless user has their own key
-    if (!settings.useOwnKey || !settings.apiKey) {
+    // Use proxy (shared key) for Groq when user hasn't opted to use own key
+    const needsOwnKey = settings.provider !== 'groq';
+    if (!needsOwnKey && (!settings.useOwnKey || !settings.apiKey)) {
         const body = {
             model: options.model || 'llama-3.3-70b-versatile',
             max_tokens: maxTokens,
@@ -2637,6 +2663,10 @@ async function callLLM(prompt, options = {}) {
         };
         if (temperature !== undefined) body.temperature = temperature;
         return callGroqProxy(body);
+    }
+
+    if (needsOwnKey && !settings.apiKey) {
+        throw new Error(`API key required for ${settings.provider}. Add your key in Settings.`);
     }
 
     const configs = {

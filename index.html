@@ -217,16 +217,17 @@
                 <button class="close-btn" id="closeSettings" aria-label="Close settings" data-i18n="settings_close" data-i18n-attr="aria-label">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="setting-group">
+                <div class="setting-group" id="ownKeyCheckboxGroup">
                     <label style="display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 14px;">
                         <input type="checkbox" id="useOwnKey" style="width: auto;">
                         Use my own API key
                     </label>
-                    <small>Weft includes a shared API key for everyone. If it runs out due to popularity, you can use your own free key from <a href="https://console.groq.com" target="_blank">console.groq.com</a></small>
+                    <small>Weft includes a shared API key for Groq. If it runs out, you can use your own free key from <a href="https://console.groq.com" target="_blank">console.groq.com</a></small>
                 </div>
                 <div class="setting-group" id="ownKeyGroup" style="display: none;">
-                    <label>Your Groq API Key</label>
+                    <label id="apiKeyLabel">Your Groq API Key</label>
                     <input type="password" id="apiKey" placeholder="gsk_...">
+                    <small id="apiKeyHelp"></small>
                 </div>
                 <div class="setting-group">
                     <label>RSS Sources</label>
