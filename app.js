@@ -1527,9 +1527,19 @@ function showArticle(article) {
                 <div id="summaryContent">
                     ${article.summary ? `
                         ${formatSummary(article.summary)}
-                        <button class="btn-secondary copy-btn" onclick="copySummary()" style="margin-top: 12px;">
-                            Copy Summary
-                        </button>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+                            <button class="btn-secondary copy-btn" onclick="copySummary()">
+                                Copy Summary
+                            </button>
+                            <button class="btn-secondary share-btn" onclick="shareSummary()" id="shareSummaryBtn">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px">
+                                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                                </svg>
+                                Share Summary
+                            </button>
+                        </div>
                     ` : `
                         <p style="color: var(--text-muted); margin-bottom: 16px;">Generate an AI-powered summary of this article</p>
                         <button class="btn-primary generate-btn" onclick="generateSummary('${article.id}')">
@@ -2007,6 +2017,44 @@ function copyToClipboard(text) {
 function copySummary() {
     if (currentArticle && currentArticle.summary) {
         copyToClipboard(currentArticle.summary);
+    }
+}
+
+async function shareSummary() {
+    if (!currentArticle || !currentArticle.summary) return;
+
+    const btn = document.getElementById('shareSummaryBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sharing…'; }
+
+    try {
+        const res = await fetch('/api/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                articleId: currentArticle.id,
+                url: currentArticle.link || currentArticle.url || '',
+                title: currentArticle.title || '',
+                source: currentArticle.source || '',
+                date: currentArticle.date || null,
+                category: currentArticle.category || null,
+                summary: currentArticle.summary,
+                summaryStyle: settings.summaryStyle || 'newsletter',
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        const { shareUrl } = await res.json();
+        await copyToClipboard(shareUrl);
+        showToast('Share link copied to clipboard!');
+    } catch (e) {
+        console.error('Share error:', e);
+        showToast('Could not create share link. Try again.');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Share Summary`; }
     }
 }
 

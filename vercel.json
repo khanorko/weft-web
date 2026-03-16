@@ -42,6 +42,8 @@
     { "source": "/api/gemini-image", "destination": "/api/gemini-image.js" },
     { "source": "/api/cors-proxy", "destination": "/api/cors-proxy.js" },
     { "source": "/api/summary-cache", "destination": "/api/summary-cache.js" },
+    { "source": "/api/share", "destination": "/api/share.js" },
+    { "source": "/share", "destination": "/api/share.js" },
     { "source": "/app", "destination": "/index.html" },
     { "source": "/", "destination": "/landing.html" }
   ]
