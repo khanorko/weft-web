@@ -1562,16 +1562,39 @@ async function loadArticles(forceRefresh = false) {
     }
 
     try {
-        const allArticles = [];
-        const feedPromises = getActiveFeeds().map(feed =>
-            fetchFeed(feed).catch(e => {
-                console.error(`Error fetching ${feed.name}:`, e);
-                return [];
-            })
-        );
+        let allArticles = [];
 
-        const results = await Promise.all(feedPromises);
-        results.forEach(feedArticles => allArticles.push(...feedArticles));
+        // Try server-side pre-fetched articles first (faster, no CORS overhead)
+        let serverFetchOk = false;
+        try {
+            const serverRes = await fetch('/api/articles?limit=400');
+            if (serverRes.ok) {
+                const data = await serverRes.json();
+                if (data.articles && data.articles.length > 0) {
+                    // Filter to active feeds only (respects user's disabled/custom feeds)
+                    const activeFeedUrls = new Set(getActiveFeeds().map(f => f.url));
+                    const customFeedUrls = new Set(customFeeds.map(f => f.url));
+                    allArticles = data.articles.filter(a =>
+                        activeFeedUrls.has(a.feedUrl) || customFeedUrls.has(a.feedUrl)
+                    );
+                    serverFetchOk = allArticles.length > 0;
+                }
+            }
+        } catch (e) {
+            console.warn('Server-side article fetch failed, falling back to RSS:', e.message);
+        }
+
+        // Fall back to direct RSS fetching if server-side unavailable or empty
+        if (!serverFetchOk) {
+            const feedPromises = getActiveFeeds().map(feed =>
+                fetchFeed(feed).catch(e => {
+                    console.error(`Error fetching ${feed.name}:`, e);
+                    return [];
+                })
+            );
+            const results = await Promise.all(feedPromises);
+            results.forEach(feedArticles => allArticles.push(...feedArticles));
+        }
 
         // Sort by date
         articles = allArticles.sort((a, b) => new Date(b.date) - new Date(a.date));
