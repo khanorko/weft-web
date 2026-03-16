@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weft-v1.3';
+const CACHE_NAME = 'weft-v2.1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -15,26 +15,36 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Activate: clean old caches, claim clients immediately
+// Activate: clean old caches, reload all clients
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    caches.keys().then(async keys => {
+      const oldKeys = keys.filter(k => k !== CACHE_NAME);
+      await Promise.all(oldKeys.map(k => caches.delete(k)));
+      if (oldKeys.length > 0) {
+        const clients = await self.clients.matchAll({ type: 'window' });
+        clients.forEach(client => client.navigate(client.url));
+      }
+    })
   );
   self.clients.claim();
 });
 
-// Fetch: network-first for core files, cache-fallback for offline
+// Fetch: only handle same-origin requests
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // API calls: network only
+  // Skip non-same-origin requests (CDN, fonts, APIs, Supabase)
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Skip API calls
   if (url.pathname.startsWith('/api/')) {
     return;
   }
 
-  // Network-first: try network, fall back to cache (for offline)
+  // Network-first for same-origin, fall back to cache for offline
   event.respondWith(
     fetch(event.request).then(response => {
       if (response.ok) {

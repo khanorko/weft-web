@@ -235,11 +235,60 @@ let settings = {
     useOwnKey: localStorage.getItem('useOwnKey') === 'true',
     summaryStyle: localStorage.getItem('summaryStyle') || 'newsletter',
     filterInterests: localStorage.getItem('filterInterests') || 'AI, machine learning, LLMs, generative AI, tech industry',
-    filterThreshold: parseInt(localStorage.getItem('filterThreshold') || '6')
+    filterThreshold: parseInt(localStorage.getItem('filterThreshold') || '6'),
+    categoryWeights: JSON.parse(localStorage.getItem('categoryWeights') || '{}')
 };
 
 // Smart filter scores cache
 let articleScores = JSON.parse(localStorage.getItem('articleScores') || '{}');
+
+// Trending detection cache
+let trendingMeta = {}; // articleId -> { trending, breaking, groupSize, groupKeyword }
+
+function computeTrendingAndBreaking(allArticles) {
+    trendingMeta = {};
+    if (allArticles.length === 0) return;
+
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    // keyword -> [{ id, source }]
+    const keywordMap = {};
+    allArticles.forEach(a => {
+        (a.keywords || []).forEach(kw => {
+            if (!keywordMap[kw]) keywordMap[kw] = [];
+            keywordMap[kw].push({ id: a.id, source: a.source });
+        });
+    });
+
+    // Keep only keywords with 3+ distinct sources
+    const trendingKeywords = {};
+    Object.entries(keywordMap).forEach(([kw, entries]) => {
+        const sources = new Set(entries.map(e => e.source));
+        if (sources.size >= 3) trendingKeywords[kw] = sources.size;
+    });
+
+    allArticles.forEach(a => {
+        const kws = a.keywords || [];
+        let maxGroupSize = 0;
+        let groupKeyword = null;
+
+        kws.forEach(kw => {
+            if (trendingKeywords[kw] && trendingKeywords[kw] > maxGroupSize) {
+                maxGroupSize = trendingKeywords[kw];
+                groupKeyword = kw;
+            }
+        });
+
+        const isTrending = maxGroupSize >= 3;
+        const articleTs = new Date(a.date).getTime();
+        const isBreaking = !isNaN(articleTs) && (now - articleTs) <= TWO_HOURS_MS;
+
+        if (isTrending || isBreaking) {
+            trendingMeta[a.id] = { trending: isTrending, breaking: isBreaking, groupSize: maxGroupSize, groupKeyword };
+        }
+    });
+}
 
 // DOM Elements
 const articleList = document.getElementById('articleList');
@@ -427,6 +476,7 @@ async function saveProfileToSupabase() {
         custom_styles: customStyles,
         disabled_feeds: disabledFeeds,
         custom_feeds: customFeeds,
+        category_weights: settings.categoryWeights,
         theme: localStorage.getItem('theme') || 'dark',
         sidebar_width: parseInt(localStorage.getItem('sidebarWidth') || '400')
     };
@@ -482,6 +532,10 @@ async function loadProfileFromSupabase() {
     if (data.custom_feeds && data.custom_feeds.length > 0) {
         customFeeds = data.custom_feeds;
         localStorage.setItem('customFeeds', JSON.stringify(customFeeds));
+    }
+    if (data.category_weights && Object.keys(data.category_weights).length > 0) {
+        settings.categoryWeights = data.category_weights;
+        localStorage.setItem('categoryWeights', JSON.stringify(data.category_weights));
     }
     if (data.theme) {
         localStorage.setItem('theme', data.theme);
@@ -876,6 +930,12 @@ function loadSettings() {
     document.getElementById('thresholdValue').textContent = `${settings.filterThreshold}/10`;
     summaryStyleSelect.value = settings.summaryStyle;
 
+    // Load category weights
+    Object.keys(CATEGORIES).forEach(catKey => {
+        const sel = document.getElementById(`catWeight_${catKey}`);
+        if (sel) sel.value = (settings.categoryWeights[catKey] ?? 1.0).toString();
+    });
+
     const useOwnKeyCheckbox = document.getElementById('useOwnKey');
     const ownKeyGroup = document.getElementById('ownKeyGroup');
     useOwnKeyCheckbox.checked = settings.useOwnKey;
@@ -898,6 +958,28 @@ function saveSettings() {
     settings.filterThreshold = parseInt(document.getElementById('filterThreshold').value);
     settings.summaryStyle = summaryStyleSelect.value;
 
+    // Save category weights and invalidate cached scores if weights changed
+    const prevWeights = JSON.stringify(settings.categoryWeights);
+    const newWeights = {};
+    Object.keys(CATEGORIES).forEach(catKey => {
+        const sel = document.getElementById(`catWeight_${catKey}`);
+        if (sel) newWeights[catKey] = parseFloat(sel.value);
+    });
+    settings.categoryWeights = newWeights;
+    if (JSON.stringify(newWeights) !== prevWeights) {
+        // Invalidate scores for categories whose weight changed
+        const changedCats = Object.keys(CATEGORIES).filter(k => {
+            const prev = JSON.parse(prevWeights || '{}')[k] ?? 1.0;
+            return (newWeights[k] ?? 1.0) !== prev;
+        });
+        if (changedCats.length > 0) {
+            articles.forEach(a => {
+                if (changedCats.includes(a.category)) delete articleScores[a.id];
+            });
+            localStorage.setItem('articleScores', JSON.stringify(articleScores));
+        }
+    }
+
     // Also save current prompt if it's a preset (allowing customization)
     const currentPrompt = promptTemplate.value.trim();
     if (currentPrompt && !settings.summaryStyle.startsWith('custom_')) {
@@ -915,6 +997,7 @@ function saveSettings() {
     localStorage.setItem('filterInterests', settings.filterInterests);
     localStorage.setItem('filterThreshold', settings.filterThreshold.toString());
     localStorage.setItem('summaryStyle', settings.summaryStyle);
+    localStorage.setItem('categoryWeights', JSON.stringify(settings.categoryWeights));
 
     settingsModal.classList.remove('open');
 
@@ -940,9 +1023,10 @@ async function loadArticles(forceRefresh = false) {
 
     if (!forceRefresh && cached && cacheTime && (Date.now() - parseInt(cacheTime)) < oneHour) {
         articles = JSON.parse(cached);
+        computeTrendingAndBreaking(articles);
         renderArticles();
         refreshBtn.classList.remove('loading');
-        
+
         // Run smart filter on unscored articles
         runSmartFilter();
         return;
@@ -966,6 +1050,9 @@ async function loadArticles(forceRefresh = false) {
         // Cache
         localStorage.setItem('articles', JSON.stringify(articles));
         localStorage.setItem('articlesTime', Date.now().toString());
+
+        // Compute trending/breaking
+        computeTrendingAndBreaking(articles);
 
         renderArticles();
         
@@ -1140,6 +1227,17 @@ function renderArticles() {
         filtered = filtered.filter(a => !a.read);
     } else if (filter === 'bookmarked') {
         filtered = filtered.filter(a => a.bookmarked);
+    } else if (filter === 'trending') {
+        // Show articles that are trending (3+ sources) or breaking (< 2h old)
+        filtered = filtered.filter(a => trendingMeta[a.id]);
+        // Sort: breaking first, then by group size desc, then by date
+        filtered.sort((a, b) => {
+            const ma = trendingMeta[a.id] || {};
+            const mb = trendingMeta[b.id] || {};
+            if (mb.breaking !== ma.breaking) return mb.breaking ? 1 : -1;
+            if ((mb.groupSize || 0) !== (ma.groupSize || 0)) return (mb.groupSize || 0) - (ma.groupSize || 0);
+            return new Date(b.date) - new Date(a.date);
+        });
     } else if (filter === 'discover') {
         const topSources = getTopReadSources(5);
         filtered = filtered
@@ -1182,10 +1280,17 @@ function renderArticles() {
             ? `<span class="score-badge ${getScoreBadgeClass(score)}">⚡ ${score}</span>`
             : '';
 
+        const meta = trendingMeta[article.id];
+        const breakingBadge = meta?.breaking ? `<span class="badge-breaking">BREAKING</span>` : '';
+        const trendingBadge = meta?.trending && !meta?.breaking
+            ? `<span class="badge-trending">TRENDING ${meta.groupSize}+</span>`
+            : (meta?.trending ? `<span class="badge-trending">TRENDING ${meta.groupSize}+</span>` : '');
+
         return `
             <div class="article-item ${article.id === currentArticle?.id ? 'active' : ''} ${article.read ? 'read' : ''}" data-id="${article.id}">
                 <div class="article-item-header">
                     <div class="article-tags">
+                        ${breakingBadge}${trendingBadge}
                         ${article.keywords.slice(0, 2).map(k => `<span class="tag">${escapeHTML(k)}</span>`).join('')}
                     </div>
                     ${scoreBadge}
@@ -1334,6 +1439,7 @@ function trackReadTime() {
             readTimes[currentArticle.id] = {
                 seconds: duration,
                 source: currentArticle.source,
+                category: currentArticle.category || null,
                 keywords: currentArticle.keywords || [],
                 ts: Date.now()
             };
@@ -1755,9 +1861,10 @@ async function runSmartFilter() {
 async function scoreBatch(batch) {
     const filterInterests = settings.filterInterests || 'AI, machine learning, LLMs, generative AI, tech industry';
 
-    const articleList = batch.map((a, i) =>
-        `[${i}] ${a.title} (${a.source})`
-    ).join('\n');
+    const articleList = batch.map((a, i) => {
+        const catLabel = a.category && CATEGORIES[a.category] ? CATEGORIES[a.category].label : null;
+        return `[${i}] ${a.title} (${a.source})${catLabel ? ` — ${catLabel}` : ''}`;
+    }).join('\n');
 
     // Build preference context from implicit feedback
     let prefContext = '';
@@ -1767,18 +1874,31 @@ async function scoreBatch(batch) {
         const engaged = entries.filter(e => e.seconds >= 30);
         const sourceCounts = {};
         const kwCounts = {};
+        const catCounts = {};
         engaged.forEach(e => {
             sourceCounts[e.source] = (sourceCounts[e.source] || 0) + 1;
             (e.keywords || []).forEach(k => { kwCounts[k] = (kwCounts[k] || 0) + 1; });
+            if (e.category) catCounts[e.category] = (catCounts[e.category] || 0) + 1;
         });
         const topSources = Object.entries(sourceCounts).sort((a,b) => b[1]-a[1]).slice(0,3).map(e => e[0]);
         const topKw = Object.entries(kwCounts).sort((a,b) => b[1]-a[1]).slice(0,5).map(e => e[0]);
+        const topCats = Object.entries(catCounts).sort((a,b) => b[1]-a[1]).slice(0,3)
+            .map(([k]) => CATEGORIES[k]?.label || k);
         if (topSources.length > 0) {
-            prefContext = `\nUser reading patterns: prefers ${topSources.join(', ')}. Frequent topics: ${topKw.join(', ')}. Boost these slightly (max +1).`;
+            prefContext = `\nUser reading patterns: prefers ${topSources.join(', ')}. Frequent topics: ${topKw.join(', ')}.${topCats.length > 0 ? ` Most-read categories: ${topCats.join(', ')}.` : ''} Boost these slightly (max +1).`;
         }
     }
 
-    const prompt = `You are a news relevance filter. Score these articles 1-10 for someone interested in: ${filterInterests}${prefContext}
+    // Build category weight context
+    const weights = settings.categoryWeights || {};
+    const weightLines = Object.entries(weights)
+        .filter(([k, v]) => v !== 1.0 && CATEGORIES[k])
+        .map(([k, v]) => `${CATEGORIES[k].label}: ${v >= 1.5 ? 'High priority' : v >= 1.0 ? 'Normal' : 'Low priority'}`);
+    const catWeightContext = weightLines.length > 0
+        ? `\nCategory priorities (adjust score accordingly): ${weightLines.join(', ')}.`
+        : '';
+
+    const prompt = `You are a news relevance filter. Score these articles 1-10 for someone interested in: ${filterInterests}${prefContext}${catWeightContext}
 
 ${articleList}
 
@@ -1801,7 +1921,9 @@ Respond with ONLY valid JSON.`;
     result.articles.forEach(scored => {
         const article = batch[scored.i];
         if (article) {
-            articleScores[article.id] = scored.s;
+            const weight = (settings.categoryWeights || {})[article.category] ?? 1.0;
+            const weightedScore = Math.min(10, Math.max(1, Math.round(scored.s * weight)));
+            articleScores[article.id] = weightedScore;
             article.groqSummary = scored.t;
             article.scoreReason = scored.r;
         }

@@ -1210,6 +1210,17 @@ body {
 .score-badge--low  { background: rgba(251, 191, 36, 0.12); color: #fbbf24; }
 .score-badge--min  { background: rgba(113, 113, 122, 0.12); color: var(--text-muted); }
 
+.badge-trending { background: rgba(251, 146, 60, 0.15); color: #fb923c; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.badge-breaking { background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; animation: pulse-red 1.5s ease-in-out infinite; }
+.badge-related  { background: rgba(148, 163, 184, 0.12); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+
+@keyframes pulse-red {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.65; }
+}
+
+.trending-group-header { padding: 8px 16px 4px; font-size: 11px; font-weight: 700; color: #fb923c; text-transform: uppercase; letter-spacing: 0.05em; border-top: 1px solid rgba(251,146,60,0.2); margin-top: 4px; }
+
 /* Detail view score tag (pill) */
 .tag--score {
     font-weight: 600;
