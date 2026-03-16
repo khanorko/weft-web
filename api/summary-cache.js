@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
-        const { id, style } = req.query;
+        const { id, style, lang } = req.query;
         if (!id || !style) {
             return res.status(400).json({ error: 'Missing id or style parameter' });
         }
@@ -40,7 +40,8 @@ export default async function handler(req, res) {
         }
 
         cleanExpired();
-        const key = `${id}:${style}`;
+        const langKey = lang && lang.length <= 10 ? lang : 'en';
+        const key = `${id}:${style}:${langKey}`;
         const entry = cache.get(key);
 
         if (entry && (Date.now() - entry.ts < TTL_MS)) {
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-        const { id, style, summary } = req.body || {};
+        const { id, style, summary, lang } = req.body || {};
 
         if (!id || !style || !summary) {
             return res.status(400).json({ error: 'Missing id, style, or summary' });
@@ -72,7 +73,8 @@ export default async function handler(req, res) {
         cleanExpired();
         evictIfNeeded();
 
-        const key = `${id}:${style}`;
+        const langKey = lang && typeof lang === 'string' && lang.length <= 10 ? lang : 'en';
+        const key = `${id}:${style}:${langKey}`;
         cache.set(key, { summary, ts: Date.now() });
 
         return res.status(200).json({ saved: true });

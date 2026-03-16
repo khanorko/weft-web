@@ -109,12 +109,12 @@
             <header class="sidebar-header">
                 <h1>Weft</h1>
                 <div class="header-actions">
-                    <button id="authBtn" class="icon-btn" title="Sign in" aria-label="Sign in">
+                    <button id="authBtn" class="icon-btn" title="Sign in" aria-label="Sign in" data-i18n="btn_sign_in" data-i18n-attr="title">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
                         </svg>
                     </button>
-                    <button id="refreshBtn" class="icon-btn" title="Refresh feeds" aria-label="Refresh feeds">
+                    <button id="refreshBtn" class="icon-btn" title="Refresh feeds" aria-label="Refresh feeds" data-i18n="btn_refresh" data-i18n-attr="title">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
                         </svg>
@@ -124,7 +124,7 @@
                             <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
                         </svg>
                     </button>
-                    <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">
+                    <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings" data-i18n="btn_settings" data-i18n-attr="title">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
                         </svg>
@@ -137,34 +137,34 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
                 </svg>
-                <input type="text" id="searchInput" placeholder="Search or ask a question...">
+                <input type="text" id="searchInput" placeholder="Search or ask a question..." data-i18n="search_placeholder" data-i18n-attr="placeholder">
             </div>
 
             <nav class="filters" aria-label="Article filters">
-                <button class="filter-btn active" data-filter="smart" title="AI-ranked by your interests (set in Settings)">Smart</button>
-                <button class="filter-btn" data-filter="all">All</button>
-                <button class="filter-btn" data-filter="unread">Unread</button>
-                <button class="filter-btn" data-filter="top" title="Score 8+">Top</button>
-                <button class="filter-btn" data-filter="trending" title="Stories covered by 3+ sources">Trending</button>
-                <button class="filter-btn" data-filter="bookmarked">Saved</button>
-                <button class="filter-btn" data-filter="discover" title="Articles outside your usual sources">Discover</button>
-                <button class="filter-btn" data-filter="briefing">Briefing</button>
+                <button class="filter-btn active" data-filter="smart" title="AI-ranked by your interests (set in Settings)" data-i18n="filter_smart" data-i18n-title="filter_smart_title">Smart</button>
+                <button class="filter-btn" data-filter="all" data-i18n="filter_all">All</button>
+                <button class="filter-btn" data-filter="unread" data-i18n="filter_unread">Unread</button>
+                <button class="filter-btn" data-filter="top" title="Score 8+" data-i18n="filter_top" data-i18n-title="filter_top_title">Top</button>
+                <button class="filter-btn" data-filter="trending" title="Stories covered by 3+ sources" data-i18n="filter_trending" data-i18n-title="filter_trending_title">Trending</button>
+                <button class="filter-btn" data-filter="bookmarked" data-i18n="filter_saved">Saved</button>
+                <button class="filter-btn" data-filter="discover" title="Articles outside your usual sources" data-i18n="filter_discover" data-i18n-title="filter_discover_title">Discover</button>
+                <button class="filter-btn" data-filter="briefing" data-i18n="filter_briefing">Briefing</button>
             </nav>
             <nav class="category-filters" aria-label="Category filters">
-                <button class="cat-btn active" data-category="">All</button>
-                <button class="cat-btn" data-category="tech">💻 Tech</button>
-                <button class="cat-btn" data-category="world">🌍 World</button>
-                <button class="cat-btn" data-category="americas">🌎 Americas</button>
-                <button class="cat-btn" data-category="europe">🇪🇺 Europe</button>
-                <button class="cat-btn" data-category="asia">🌏 Asia</button>
-                <button class="cat-btn" data-category="mideast">🕌 Middle East</button>
-                <button class="cat-btn" data-category="africa">🌍 Africa</button>
-                <button class="cat-btn" data-category="business">💼 Business</button>
-                <button class="cat-btn" data-category="science">🔬 Science</button>
-                <button class="cat-btn" data-category="politics">🏛️ Politics</button>
-                <button class="cat-btn" data-category="sports">⚽ Sports</button>
-                <button class="cat-btn" data-category="culture">🎭 Culture</button>
-                <button class="cat-btn" data-category="design">🎨 Design</button>
+                <button class="cat-btn active" data-category="" data-i18n="cat_all">All</button>
+                <button class="cat-btn" data-category="tech" data-i18n="cat_tech">💻 Tech</button>
+                <button class="cat-btn" data-category="world" data-i18n="cat_world">🌍 World</button>
+                <button class="cat-btn" data-category="americas" data-i18n="cat_americas">🌎 Americas</button>
+                <button class="cat-btn" data-category="europe" data-i18n="cat_europe">🇪🇺 Europe</button>
+                <button class="cat-btn" data-category="asia" data-i18n="cat_asia">🌏 Asia</button>
+                <button class="cat-btn" data-category="mideast" data-i18n="cat_mideast">🕌 Middle East</button>
+                <button class="cat-btn" data-category="africa" data-i18n="cat_africa">🌍 Africa</button>
+                <button class="cat-btn" data-category="business" data-i18n="cat_business">💼 Business</button>
+                <button class="cat-btn" data-category="science" data-i18n="cat_science">🔬 Science</button>
+                <button class="cat-btn" data-category="politics" data-i18n="cat_politics">🏛️ Politics</button>
+                <button class="cat-btn" data-category="sports" data-i18n="cat_sports">⚽ Sports</button>
+                <button class="cat-btn" data-category="culture" data-i18n="cat_culture">🎭 Culture</button>
+                <button class="cat-btn" data-category="design" data-i18n="cat_design">🎨 Design</button>
             </nav>
 
             <div class="article-list" id="articleList" role="list" aria-label="Article list" aria-live="polite" aria-atomic="false">
@@ -201,8 +201,8 @@
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
                 </svg>
-                <h2>Select an article</h2>
-                <p>Choose an article from the sidebar to read</p>
+                <h2 data-i18n="empty_title">Select an article</h2>
+                <p data-i18n="empty_sub">Choose an article from the sidebar to read</p>
             </div>
         </main>
     </div>
@@ -211,8 +211,8 @@
     <div class="modal" id="settingsModal" role="dialog" aria-modal="true" aria-label="Settings">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Settings</h2>
-                <button class="close-btn" id="closeSettings" aria-label="Close settings">&times;</button>
+                <h2 data-i18n="settings_title">Settings</h2>
+                <button class="close-btn" id="closeSettings" aria-label="Close settings" data-i18n="settings_close" data-i18n-attr="aria-label">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="setting-group">
@@ -386,6 +386,19 @@
                         <option value="openai">OpenAI (GPT-4o-mini)</option>
                         <option value="anthropic">Anthropic (Claude)</option>
                     </select>
+                </div>
+                <div class="setting-group">
+                    <label>Summary Language</label>
+                    <select id="preferredLanguage">
+                        <option value="en">English</option>
+                        <option value="sv">Svenska</option>
+                        <option value="es">Español</option>
+                        <option value="de">Deutsch</option>
+                        <option value="fr">Français</option>
+                        <option value="zh">中文</option>
+                        <option value="ja">日本語</option>
+                    </select>
+                    <small>AI summaries will be generated in this language.</small>
                 </div>
                 <div class="setting-group">
                     <label>Summary Style</label>
@@ -605,6 +618,7 @@
     <div class="toast-container" id="toastContainer"></div>
     <!-- Scripts: defer preserves order while allowing parallel download -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer crossorigin="anonymous"></script>
+    <script src="locales.js"></script>
     <script src="app.js" defer></script>
     <script>
         if ('serviceWorker' in navigator) {

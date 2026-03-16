@@ -307,11 +307,63 @@ let activeCategory = null; // null = All Categories
 let isMobile = window.innerWidth <= 900;
 window.addEventListener('resize', () => { isMobile = window.innerWidth <= 900; });
 let customStyles = JSON.parse(localStorage.getItem('customStyles') || '{}');
+// Safe i18n wrapper — falls back to identity if locales.js not loaded
+function t(key, vars) {
+    if (typeof window.t === 'function') return window.t(key, vars);
+    if (vars && vars.n !== undefined) return `${vars.n}`;
+    return key;
+}
+
+// Detect browser language, normalize to supported codes
+function detectBrowserLanguage() {
+    const supported = ['en', 'sv', 'es', 'de', 'fr', 'zh', 'ja'];
+    const lang = (navigator.language || 'en').toLowerCase().split('-')[0];
+    return supported.includes(lang) ? lang : 'en';
+}
+
+// Detect source language of article text using heuristics
+// Returns one of: en, sv, de, fr, es, zh, ja — defaults to 'en'
+function detectSourceLanguage(text) {
+    if (!text || text.length < 20) return 'en';
+
+    const s = text.toLowerCase();
+
+    // CJK detection via Unicode ranges
+    const cjkCount = (s.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
+    const jpKana = (s.match(/[\u3040-\u30ff]/g) || []).length;
+    if (jpKana > 2) return 'ja';
+    if (cjkCount > text.length * 0.15) return 'zh';
+
+    // Tokenize into words
+    const words = s.match(/\b[a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿœ]+\b/g) || [];
+    if (words.length < 5) return 'en';
+
+    const wordSet = new Set(words);
+    function score(stopwords) {
+        let hits = 0;
+        for (const w of stopwords) if (wordSet.has(w)) hits++;
+        return hits;
+    }
+
+    const scores = {
+        sv: score(['och','att','det','är','en','för','med','på','av','i','om','den','som','har','de','men','ett','inte','var','han','hon','vi','till','från','sedan','när','under','mellan']),
+        de: score(['die','der','und','in','von','ist','das','den','nicht','auf','ein','eine','dem','des','mit','sich','war','auch','an','bei','nach','wenn','als','er','sie','wir','du']),
+        fr: score(['le','la','les','un','une','des','est','et','en','du','dans','je','il','elle','nous','vous','ils','elles','que','qui','pas','plus','avec','pour','par','sur','tout']),
+        es: score(['el','la','los','las','de','que','en','un','una','es','y','del','por','con','para','son','pero','como','más','este','esta','al','se','su','no','lo','fue','era']),
+        en: score(['the','of','and','to','in','a','is','that','it','he','was','for','on','are','as','with','his','they','be','at','one','have','this','from','or','had','by','not','but','what']),
+    };
+
+    const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+    // Need at least 3 hits to be confident, otherwise default to en
+    return best[1] >= 3 ? best[0] : 'en';
+}
+
 let settings = {
     provider: localStorage.getItem('llmProvider') || 'groq',
     apiKey: localStorage.getItem('apiKey') || '',
     useOwnKey: localStorage.getItem('useOwnKey') === 'true',
     summaryStyle: localStorage.getItem('summaryStyle') || 'newsletter',
+    preferredLanguage: localStorage.getItem('preferredLanguage') || detectBrowserLanguage(),
     filterInterests: localStorage.getItem('filterInterests') || 'AI, machine learning, LLMs, generative AI, tech industry',
     filterThreshold: parseInt(localStorage.getItem('filterThreshold') || '6'),
     categoryWeights: JSON.parse(localStorage.getItem('categoryWeights') || '{}'),
@@ -710,6 +762,81 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// ==================== REGION DEFAULTS ====================
+
+// Returns suggested category weights based on browser locale.
+// Used to pre-select onboarding categories and set initial defaults for new users.
+function getRegionDefaults(locale) {
+    const lang = (locale || navigator.language || 'en').toLowerCase();
+    const country = lang.includes('-') ? lang.split('-')[1] : '';
+    const base = lang.split('-')[0];
+
+    // Base weights: all Normal (1.0)
+    const defaults = {};
+    Object.keys(CATEGORIES || {}).forEach(k => { defaults[k] = 1.0; });
+
+    // Always boost tech + world for everyone
+    defaults.tech = 1.5;
+    defaults.world = 1.5;
+
+    // Regional boosts
+    if (base === 'sv' || country === 'se' || country === 'fi' || country === 'no' || country === 'dk') {
+        // Nordic
+        defaults.europe = 1.5;
+        defaults.politics = 1.5;
+    } else if (base === 'de' || country === 'de' || country === 'at' || country === 'ch') {
+        defaults.europe = 1.5;
+        defaults.business = 1.5;
+    } else if (base === 'fr' || country === 'fr' || country === 'be') {
+        defaults.europe = 1.5;
+        defaults.culture = 1.5;
+    } else if (base === 'zh' || country === 'cn' || country === 'tw' || country === 'hk' || country === 'sg') {
+        defaults.asia = 1.5;
+        defaults.business = 1.5;
+    } else if (base === 'ja' || country === 'jp') {
+        defaults.asia = 1.5;
+        defaults.tech = 2.0;
+        defaults.science = 1.5;
+    } else if (base === 'es' || country === 'mx' || country === 'ar' || country === 'co' || country === 'es') {
+        defaults.americas = 1.5;
+        defaults.politics = 1.5;
+    } else if (base === 'pt' || country === 'br' || country === 'pt') {
+        defaults.americas = 1.5;
+        defaults.business = 1.5;
+    } else if (base === 'ar' || country === 'sa' || country === 'ae' || country === 'eg') {
+        defaults.mideast = 1.5;
+        defaults.world = 2.0;
+    } else if (country === 'in' || country === 'pk' || country === 'bd') {
+        defaults.asia = 1.5;
+        defaults.business = 1.5;
+    } else if (country === 'au' || country === 'nz') {
+        defaults.asia = 1.5;
+        defaults.science = 1.5;
+    } else if (country === 'ca') {
+        defaults.americas = 1.5;
+        defaults.politics = 1.5;
+    } else if (country === 'gb' || country === 'ie') {
+        defaults.europe = 1.5;
+        defaults.politics = 1.5;
+    } else if (country === 'ng' || country === 'za' || country === 'ke' || country === 'gh') {
+        defaults.africa = 1.5;
+        defaults.world = 2.0;
+    }
+
+    return defaults;
+}
+
+// Pre-select onboarding category buttons based on region defaults
+function _applyRegionToOnboarding() {
+    const defaults = getRegionDefaults(navigator.language);
+    document.querySelectorAll('.onboarding-cat-btn').forEach(btn => {
+        const cat = btn.dataset.cat;
+        if (cat && defaults[cat] && defaults[cat] >= 1.5) {
+            btn.classList.add('selected');
+        }
+    });
+}
+
 // ==================== ONBOARDING ====================
 
 function showOnboardingIfNeeded() {
@@ -788,6 +915,8 @@ function _onboardingGoToStep(step) {
     document.getElementById('onboardingStep3').style.display = step === 3 ? '' : 'none';
     const bar = document.getElementById('onboardingProgressBar');
     if (bar) bar.style.width = (step / 3 * 100) + '%';
+    // Pre-select region-appropriate categories on first step
+    if (step === 1) _applyRegionToOnboarding();
 }
 
 function _onboardingApplyPreferences() {
@@ -935,6 +1064,8 @@ async function saveProfileToSupabase() {
         filter_interests: settings.filterInterests,
         filter_threshold: settings.filterThreshold,
         summary_style: settings.summaryStyle,
+        preferred_language: settings.preferredLanguage || 'en',
+        preferred_locale: navigator.language || 'en',
         llm_provider: settings.provider,
         use_own_key: settings.useOwnKey,
         custom_styles: customStyles,
@@ -982,6 +1113,16 @@ async function loadProfileFromSupabase() {
     if (data.summary_style) {
         settings.summaryStyle = data.summary_style;
         localStorage.setItem('summaryStyle', data.summary_style);
+    }
+    if (data.preferred_language) {
+        settings.preferredLanguage = data.preferred_language;
+        localStorage.setItem('preferredLanguage', data.preferred_language);
+    }
+    if (data.preferred_locale && !localStorage.getItem('categoryWeights')) {
+        // New device login with no local weights — apply saved region defaults
+        const regionWeights = getRegionDefaults(data.preferred_locale);
+        settings.categoryWeights = regionWeights;
+        localStorage.setItem('categoryWeights', JSON.stringify(regionWeights));
     }
     if (data.llm_provider) {
         settings.provider = data.llm_provider;
@@ -1171,6 +1312,15 @@ async function loadInteractionsFromSupabase() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Set active language for i18n
+    window._weftLang = settings.preferredLanguage || 'en';
+    if (typeof window.applyTranslations === 'function') window.applyTranslations();
+
+    // Apply region defaults for new users with no saved category weights
+    if (!settings.categoryWeights || Object.keys(settings.categoryWeights).length === 0) {
+        settings.categoryWeights = getRegionDefaults(navigator.language);
+    }
+
     initSupabase();
     loadCustomStyles();
     loadSettings();
@@ -1502,6 +1652,8 @@ function loadSettings() {
     document.getElementById('filterThreshold').value = settings.filterThreshold;
     document.getElementById('thresholdValue').textContent = `${settings.filterThreshold}/10`;
     summaryStyleSelect.value = settings.summaryStyle;
+    const langSelect = document.getElementById('preferredLanguage');
+    if (langSelect) langSelect.value = settings.preferredLanguage || 'en';
 
     // Load category weights
     Object.keys(CATEGORIES).forEach(catKey => {
@@ -1597,6 +1749,14 @@ function saveSettings() {
         }
     }
 
+    const langSelect = document.getElementById('preferredLanguage');
+    if (langSelect) {
+        settings.preferredLanguage = langSelect.value;
+        localStorage.setItem('preferredLanguage', settings.preferredLanguage);
+        window._weftLang = settings.preferredLanguage;
+        if (typeof window.applyTranslations === 'function') window.applyTranslations();
+    }
+
     localStorage.setItem('llmProvider', settings.provider);
     localStorage.setItem('apiKey', settings.apiKey);
     localStorage.setItem('useOwnKey', settings.useOwnKey.toString());
@@ -1647,7 +1807,7 @@ async function loadArticles(forceRefresh = false) {
     articleList.innerHTML = `
         <div class="loading">
             <div class="loading-dots"><span></span><span></span><span></span></div>
-            <p style="margin-top: 16px;">Fetching articles...</p>
+            <p style="margin-top: 16px;">${t('loading_fetching')}</p>
         </div>`;
 
     // Try to load from cache first
@@ -1774,15 +1934,17 @@ async function fetchFeed(feed) {
         // Create unique ID from link hash
         const uniqueId = 'art_' + hashCode(link + feed.name);
 
+        const cleanDesc = cleanHTML(description).slice(0, 300);
         articles.push({
             id: uniqueId,
             title: cleanHTML(title),
-            description: cleanHTML(description).slice(0, 300),
+            description: cleanDesc,
             link,
             date: pubDate,
             source: feed.name,
             category: feed.category,
             keywords,
+            sourceLang: detectSourceLanguage(cleanHTML(title) + ' ' + cleanDesc),
             summary: null,
             liked: false,
             disliked: false,
@@ -1930,7 +2092,7 @@ function renderArticles() {
                 </svg>
                 <p style="color: var(--text-muted);">No articles found</p>
             </div>`;
-        articleCount.textContent = '0 articles';
+        articleCount.textContent = t('articles_count', { n: 0 });
         return;
     }
 
@@ -1967,7 +2129,7 @@ function renderArticles() {
         `;
     }).join('');
 
-    articleCount.textContent = `${filtered.length} articles`;
+    articleCount.textContent = filtered.length === 1 ? t('articles_count_one') : t('articles_count', { n: filtered.length });
     updateStreakIndicator();
 }
 
@@ -2225,12 +2387,12 @@ function showArticle(article) {
                             </button>
                         </div>
                     ` : `
-                        <p style="color: var(--text-muted); margin-bottom: 16px;">Generate an AI-powered summary of this article</p>
+                        <p style="color: var(--text-muted); margin-bottom: 16px;">${t('summary_prompt')}</p>
                         <button class="btn-primary generate-btn" onclick="generateSummary('${article.id}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
                                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                             </svg>
-                            Generate Summary
+                            ${t('summary_generate')}
                         </button>
                     `}
                 </div>
@@ -2356,6 +2518,27 @@ function toggleBookmark(id) {
     }
 }
 
+const LANGUAGE_NAMES = {
+    en: 'English', sv: 'Swedish', es: 'Spanish',
+    de: 'German', fr: 'French', zh: 'Chinese', ja: 'Japanese',
+};
+
+// Build language instruction for summary prompt.
+// When source and target differ, be explicit to improve LLM accuracy.
+function buildLangInstruction(article) {
+    const targetLang = settings.preferredLanguage || 'en';
+    if (targetLang === 'en') return '';
+
+    const targetName = LANGUAGE_NAMES[targetLang] || targetLang;
+    const sourceLang = article.sourceLang || 'en';
+    const sourceName = LANGUAGE_NAMES[sourceLang] || sourceLang;
+
+    if (sourceLang !== targetLang) {
+        return `\n\nThe article above is written in ${sourceName}. Provide your summary in ${targetName}.`;
+    }
+    return `\n\nRespond in ${targetName}.`;
+}
+
 function getCurrentPrompt(article) {
     const style = settings.summaryStyle;
 
@@ -2363,14 +2546,18 @@ function getCurrentPrompt(article) {
     if (style.startsWith('custom_')) {
         const customName = style.replace('custom_', '');
         const template = customStyles[customName] || PRESET_PROMPTS.newsletter;
-        return template.replace('{{title}}', article.title).replace('{{content}}', article.description);
+        let prompt = template.replace('{{title}}', article.title).replace('{{content}}', article.description);
+        prompt += buildLangInstruction(article);
+        return prompt;
     }
 
     // Check for modified preset
     const modifiedPrompt = localStorage.getItem('modifiedPrompt_' + style);
     const template = modifiedPrompt || PRESET_PROMPTS[style] || PRESET_PROMPTS.newsletter;
 
-    return template.replace('{{title}}', article.title).replace('{{content}}', article.description);
+    let prompt = template.replace('{{title}}', article.title).replace('{{content}}', article.description);
+    prompt += buildLangInstruction(article);
+    return prompt;
 }
 
 async function generateSummary(id) {
@@ -2389,15 +2576,16 @@ async function generateSummary(id) {
     summaryContent.innerHTML = `
         <div class="loading-state">
             <div class="loading-dots"><span></span><span></span><span></span></div>
-            <span>Generating summary...</span>
+            <span>${t('summary_generating')}</span>
         </div>
     `;
 
     const style = settings.summaryStyle || 'newsletter';
+    const lang = settings.preferredLanguage || 'en';
 
     // 1. Check server-side cache first
     try {
-        const cacheRes = await fetch(`/api/summary-cache?id=${encodeURIComponent(id)}&style=${encodeURIComponent(style)}`);
+        const cacheRes = await fetch(`/api/summary-cache?id=${encodeURIComponent(id)}&style=${encodeURIComponent(style)}&lang=${encodeURIComponent(lang)}`);
         const cacheData = await cacheRes.json();
         if (cacheData.cached && cacheData.summary) {
             article.summary = cacheData.summary;
@@ -2420,7 +2608,7 @@ async function generateSummary(id) {
         fetch('/api/summary-cache', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, style, summary })
+            body: JSON.stringify({ id, style, summary, lang })
         }).catch(() => {});
 
         // 4. Save to Supabase (fire-and-forget)
@@ -2430,7 +2618,7 @@ async function generateSummary(id) {
     } catch (error) {
         summaryContent.innerHTML = `
             <p style="color: var(--danger); margin-bottom: 16px;">Error: ${escapeHTML(error.message)}</p>
-            <button class="btn-primary generate-btn" onclick="generateSummary('${article.id}')">Try Again</button>
+            <button class="btn-primary generate-btn" onclick="generateSummary('${article.id}')">${t('summary_try_again')}</button>
         `;
     }
 }
