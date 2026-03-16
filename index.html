@@ -8,13 +8,13 @@
     <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)">
     <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://weft-web.vercel.app/">
+    <link rel="canonical" href="https://weft-web.vercel.app/app">
 
     <!-- Open Graph -->
     <meta property="og:title" content="Weft — Pattern from noise">
     <meta property="og:description" content="Free AI news aggregator with smart scoring, daily briefings, answer engine, and summaries from 20+ RSS sources.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://weft-web.vercel.app/">
+    <meta property="og:url" content="https://weft-web.vercel.app/app">
     <meta property="og:site_name" content="Weft">
     <meta property="og:locale" content="en_US">
     <meta property="og:image" content="https://weft-web.vercel.app/icon-512.png">
@@ -120,6 +120,7 @@
                 <button class="filter-btn" data-filter="all">All</button>
                 <button class="filter-btn" data-filter="unread">Unread</button>
                 <button class="filter-btn" data-filter="top" title="Score 8+">Top</button>
+                <button class="filter-btn" data-filter="trending" title="Stories covered by 3+ sources">Trending</button>
                 <button class="filter-btn" data-filter="bookmarked">Saved</button>
                 <button class="filter-btn" data-filter="discover" title="Articles outside your usual sources">Discover</button>
                 <button class="filter-btn" data-filter="briefing">Briefing</button>
@@ -211,6 +212,84 @@
                         <span id="thresholdValue" style="color: var(--accent); font-weight: 600; min-width: 40px;">6/10</span>
                     </div>
                     <small>Only show articles with score ≥ this value in Smart filter</small>
+                </div>
+                <div class="setting-group">
+                    <label>Category Priorities</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                            <span style="font-size:13px;">Tech &amp; AI</span>
+                            <select id="catWeight_tech" style="font-size:12px; padding:2px 4px;">
+                                <option value="0.5">Low</option>
+                                <option value="1.0" selected>Normal</option>
+                                <option value="1.5">High</option>
+                                <option value="2.0">Must</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                            <span style="font-size:13px;">World</span>
+                            <select id="catWeight_world" style="font-size:12px; padding:2px 4px;">
+                                <option value="0.5">Low</option>
+                                <option value="1.0" selected>Normal</option>
+                                <option value="1.5">High</option>
+                                <option value="2.0">Must</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                            <span style="font-size:13px;">Business</span>
+                            <select id="catWeight_business" style="font-size:12px; padding:2px 4px;">
+                                <option value="0.5">Low</option>
+                                <option value="1.0" selected>Normal</option>
+                                <option value="1.5">High</option>
+                                <option value="2.0">Must</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                            <span style="font-size:13px;">Science</span>
+                            <select id="catWeight_science" style="font-size:12px; padding:2px 4px;">
+                                <option value="0.5">Low</option>
+                                <option value="1.0" selected>Normal</option>
+                                <option value="1.5">High</option>
+                                <option value="2.0">Must</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                            <span style="font-size:13px;">Politics</span>
+                            <select id="catWeight_politics" style="font-size:12px; padding:2px 4px;">
+                                <option value="0.5">Low</option>
+                                <option value="1.0" selected>Normal</option>
+                                <option value="1.5">High</option>
+                                <option value="2.0">Must</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                            <span style="font-size:13px;">Sports</span>
+                            <select id="catWeight_sports" style="font-size:12px; padding:2px 4px;">
+                                <option value="0.5">Low</option>
+                                <option value="1.0" selected>Normal</option>
+                                <option value="1.5">High</option>
+                                <option value="2.0">Must</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                            <span style="font-size:13px;">Culture</span>
+                            <select id="catWeight_culture" style="font-size:12px; padding:2px 4px;">
+                                <option value="0.5">Low</option>
+                                <option value="1.0" selected>Normal</option>
+                                <option value="1.5">High</option>
+                                <option value="2.0">Must</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                            <span style="font-size:13px;">Design &amp; UX</span>
+                            <select id="catWeight_design" style="font-size:12px; padding:2px 4px;">
+                                <option value="0.5">Low</option>
+                                <option value="1.0" selected>Normal</option>
+                                <option value="1.5">High</option>
+                                <option value="2.0">Must</option>
+                            </select>
+                        </div>
+                    </div>
+                    <small>Boosts or reduces Smart Filter scores per category (affects re-scoring on next refresh)</small>
                 </div>
                 <div class="setting-group">
                     <label>LLM Provider (for summaries)</label>

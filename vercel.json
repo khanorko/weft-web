@@ -4,11 +4,23 @@
   "framework": null,
   "headers": [
     {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/(app\\.js|style\\.css|index\\.html)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.groq.com https://api.openai.com https://api.anthropic.com; frame-src 'none'; object-src 'none'; base-uri 'self'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.groq.com https://api.openai.com https://api.anthropic.com https://*.supabase.co https://cdn.jsdelivr.net; frame-src 'none'; object-src 'none'; base-uri 'self'"
         },
         {
           "key": "X-Content-Type-Options",
@@ -29,6 +41,8 @@
     { "source": "/api/groq", "destination": "/api/groq.js" },
     { "source": "/api/gemini-image", "destination": "/api/gemini-image.js" },
     { "source": "/api/cors-proxy", "destination": "/api/cors-proxy.js" },
-    { "source": "/api/summary-cache", "destination": "/api/summary-cache.js" }
+    { "source": "/api/summary-cache", "destination": "/api/summary-cache.js" },
+    { "source": "/app", "destination": "/index.html" },
+    { "source": "/", "destination": "/landing.html" }
   ]
 }

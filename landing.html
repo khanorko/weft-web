@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weft — Pattern from noise | AI-powered news aggregator</title>
+    <meta name="description" content="Weft curates and scores news from 100+ RSS sources using AI. Get daily briefings, AI summaries, smart filtering, and an answer engine — free.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://weft-web.vercel.app/">
+    <meta name="theme-color" content="#0a0a0b">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Weft — Pattern from noise | AI-powered news">
+    <meta property="og:description" content="AI curates and scores news from 100+ sources. Daily briefings, smart summaries, answer engine — free.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://weft-web.vercel.app/">
+    <meta property="og:site_name" content="Weft">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="https://weft-web.vercel.app/icon-512.png">
+    <meta property="og:image:width" content="512">
+    <meta property="og:image:height" content="512">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Weft — AI-powered news aggregator">
+    <meta name="twitter:description" content="100+ RSS sources. AI scoring, summaries, daily briefings and an answer engine. Free.">
+    <meta name="twitter:image" content="https://weft-web.vercel.app/icon-512.png">
+
+    <!-- Schema.org: WebApplication + ItemList of top stories -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "Weft",
+                "url": "https://weft-web.vercel.app",
+                "description": "AI-powered news aggregator that scores, summarizes, and curates 100+ tech and AI RSS feeds with daily briefings, an answer engine, and smart filtering.",
+                "applicationCategory": "NewsApplication",
+                "operatingSystem": "Web",
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD"
+                },
+                "featureList": [
+                    "AI-powered article scoring and ranking",
+                    "AI-generated summaries in multiple styles",
+                    "Daily AI briefing with key themes",
+                    "Answer engine for natural language questions",
+                    "100+ curated RSS feeds across tech, AI, business, science, world",
+                    "Smart category filtering",
+                    "Discovery mode to counter filter bubbles",
+                    "PWA — installable, works offline"
+                ]
+            },
+            {
+                "@type": "ItemList",
+                "name": "Today's top stories on Weft",
+                "description": "AI-scored and summarized top news stories from across 100+ sources",
+                "itemListElement": [
+                    {
+                        "@type": "ListItem",
+                        "position": 1,
+                        "item": {
+                            "@type": "NewsArticle",
+                            "headline": "AI models reach new reasoning benchmarks in 2026 evaluations",
+                            "description": "Frontier AI labs report continued advances in multi-step reasoning, with several models now exceeding human performance on standardized tests.",
+                            "articleSection": "AI"
+                        }
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 2,
+                        "item": {
+                            "@type": "NewsArticle",
+                            "headline": "EU AI Act implementation begins: what enterprises need to know",
+                            "description": "The European Union's AI Act enters enforcement phase, setting compliance requirements for high-risk AI systems used across industries.",
+                            "articleSection": "Tech Policy"
+                        }
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 3,
+                        "item": {
+                            "@type": "NewsArticle",
+                            "headline": "Apple's on-device AI strategy reshapes the smartphone market",
+                            "description": "Apple's focus on private, on-device inference is driving a hardware upgrade cycle and raising the bar for competitors.",
+                            "articleSection": "Tech"
+                        }
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 4,
+                        "item": {
+                            "@type": "NewsArticle",
+                            "headline": "Open-source LLMs close gap with proprietary models",
+                            "description": "Community-developed language models continue to match or exceed closed-source counterparts on key benchmarks, democratizing AI access.",
+                            "articleSection": "AI"
+                        }
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 5,
+                        "item": {
+                            "@type": "NewsArticle",
+                            "headline": "Climate tech investment hits record high as energy transition accelerates",
+                            "description": "Global investment in clean energy and climate technology surpassed previous records, driven by policy incentives and falling costs.",
+                            "articleSection": "Business"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+
+    <!-- PWA / Icons -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/icon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+
+    <!-- AI discoverability -->
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-readable site info">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap">
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0a0a0b;
+            --surface: #111113;
+            --surface2: #18181b;
+            --border: #27272a;
+            --text: #fafafa;
+            --text-muted: #a1a1aa;
+            --text-subtle: #52525b;
+            --accent: #e4e4e7;
+            --green: #22c55e;
+            --blue: #3b82f6;
+            --serif: 'Instrument Serif', Georgia, serif;
+            --sans: 'DM Sans', system-ui, sans-serif;
+        }
+
+        html { font-size: 16px; scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            font-weight: 400;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        a { color: inherit; text-decoration: none; }
+
+        /* NAV */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 2rem;
+            background: rgba(10, 10, 11, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .nav-logo {
+            font-family: var(--serif);
+            font-size: 1.25rem;
+            letter-spacing: -0.02em;
+            color: var(--text);
+        }
+
+        .nav-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: var(--text);
+            color: var(--bg);
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 0.5rem 1.1rem;
+            border-radius: 6px;
+            transition: opacity 0.15s;
+        }
+        .nav-cta:hover { opacity: 0.88; }
+
+        /* HERO */
+        .hero {
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 6rem 1.5rem 4rem;
+            position: relative;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(59,130,246,0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 0.35rem 0.85rem;
+            margin-bottom: 2rem;
+            letter-spacing: 0.02em;
+        }
+
+        .hero-badge .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--green);
+            border-radius: 50%;
+        }
+
+        h1 {
+            font-family: var(--serif);
+            font-size: clamp(2.8rem, 7vw, 5.5rem);
+            font-weight: 400;
+            line-height: 1.05;
+            letter-spacing: -0.03em;
+            color: var(--text);
+            margin-bottom: 1.25rem;
+        }
+
+        h1 em {
+            font-style: italic;
+            color: var(--text-muted);
+        }
+
+        .hero-sub {
+            font-size: clamp(1rem, 2.5vw, 1.2rem);
+            color: var(--text-muted);
+            max-width: 560px;
+            line-height: 1.65;
+            margin-bottom: 2.5rem;
+        }
+
+        .hero-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--text);
+            color: var(--bg);
+            font-size: 1rem;
+            font-weight: 500;
+            padding: 0.75rem 1.75rem;
+            border-radius: 8px;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 1rem;
+            font-weight: 400;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .btn-secondary:hover { border-color: var(--text-subtle); color: var(--text); }
+
+        .hero-note {
+            margin-top: 1.25rem;
+            font-size: 0.8rem;
+            color: var(--text-subtle);
+        }
+
+        /* STATS BAR */
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            padding: 2rem;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-family: var(--serif);
+            font-size: 2rem;
+            color: var(--text);
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+        }
+
+        /* HEADLINES */
+        .section {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 5rem 1.5rem;
+        }
+
+        .section-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-subtle);
+            margin-bottom: 0.75rem;
+        }
+
+        .section-title {
+            font-family: var(--serif);
+            font-size: clamp(1.75rem, 4vw, 2.5rem);
+            font-weight: 400;
+            letter-spacing: -0.02em;
+            color: var(--text);
+            margin-bottom: 0.75rem;
+        }
+
+        .section-sub {
+            font-size: 1rem;
+            color: var(--text-muted);
+            max-width: 520px;
+            margin-bottom: 2.5rem;
+        }
+
+        /* Article cards */
+        .headlines-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--surface);
+        }
+
+        .headline-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 1.25rem;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.1s;
+        }
+
+        .headline-card:last-child { border-bottom: none; }
+        .headline-card:hover { background: var(--surface2); }
+
+        .score-badge {
+            flex-shrink: 0;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(34, 197, 94, 0.12);
+            color: var(--green);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .score-badge.high {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--green);
+            border-color: rgba(34, 197, 94, 0.25);
+        }
+
+        .score-badge.mid {
+            background: rgba(234, 179, 8, 0.12);
+            color: #ca8a04;
+            border-color: rgba(234, 179, 8, 0.2);
+        }
+
+        .headline-content { flex: 1; min-width: 0; }
+
+        .headline-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .category-tag {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-subtle);
+        }
+
+        .source-tag {
+            font-size: 0.75rem;
+            color: var(--text-subtle);
+        }
+
+        .headline-title {
+            font-size: 0.975rem;
+            font-weight: 500;
+            color: var(--text);
+            line-height: 1.45;
+            margin-bottom: 0.35rem;
+        }
+
+        .headline-summary {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.55;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .trending-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #f97316;
+            background: rgba(249, 115, 22, 0.1);
+            border: 1px solid rgba(249, 115, 22, 0.2);
+            border-radius: 100px;
+            padding: 0.15rem 0.5rem;
+            margin-left: 0.35rem;
+        }
+
+        .headlines-cta {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-subtle);
+        }
+
+        .headlines-cta a {
+            color: var(--text-muted);
+            text-decoration: underline;
+            text-decoration-color: var(--border);
+            text-underline-offset: 3px;
+        }
+        .headlines-cta a:hover { color: var(--text); }
+
+        /* FEATURES */
+        .features-section {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .features-section .section {
+            padding: 5rem 1.5rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .feature-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+
+        .feature-icon {
+            width: 2.25rem;
+            height: 2.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        .feature-card h3 {
+            font-size: 0.975rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.4rem;
+        }
+
+        .feature-card p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* HOW IT WORKS */
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            counter-reset: step;
+        }
+
+        .step {
+            display: flex;
+            gap: 1.25rem;
+            align-items: flex-start;
+        }
+
+        .step-num {
+            flex-shrink: 0;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            counter-increment: step;
+        }
+
+        .step-content h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.3rem;
+        }
+
+        .step-content p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* CTA SECTION */
+        .cta-section {
+            text-align: center;
+            padding: 6rem 1.5rem;
+        }
+
+        .cta-section h2 {
+            font-family: var(--serif);
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 400;
+            letter-spacing: -0.025em;
+            color: var(--text);
+            margin-bottom: 1rem;
+        }
+
+        .cta-section p {
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            max-width: 440px;
+            margin: 0 auto 2.5rem;
+        }
+
+        /* FOOTER */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 2rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: gap-1rem;
+        }
+
+        .footer-logo {
+            font-family: var(--serif);
+            font-size: 1rem;
+            color: var(--text-muted);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--text-subtle);
+        }
+
+        .footer-links a:hover { color: var(--text-muted); }
+
+        /* MOBILE */
+        @media (max-width: 640px) {
+            nav { padding: 0.85rem 1.25rem; }
+            .stats { gap: 1.75rem; }
+            .headline-card { gap: 0.75rem; padding: 1rem 1.125rem; }
+            footer { flex-direction: column; gap: 1rem; text-align: center; }
+            .features-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Transition for auth redirect */
+        body.redirecting { opacity: 0; transition: opacity 0.15s; }
+    </style>
+</head>
+<body>
+
+    <!-- Nav -->
+    <nav>
+        <a href="/" class="nav-logo">Weft</a>
+        <a href="/app" class="nav-cta">Open app →</a>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-badge">
+            <span class="dot"></span>
+            Free &amp; open · No ads · 100+ sources
+        </div>
+        <h1>Pattern from <em>noise</em></h1>
+        <p class="hero-sub">
+            AI reads 100+ news sources, scores every article, and distills what matters — so you don't have to scroll through noise.
+        </p>
+        <div class="hero-actions">
+            <a href="/app" class="btn-primary">Start reading free →</a>
+            <a href="#headlines" class="btn-secondary">See today's stories</a>
+        </div>
+        <p class="hero-note">No account required to explore · Sign in to personalize</p>
+    </section>
+
+    <!-- Stats -->
+    <div class="stats" aria-label="Weft by the numbers">
+        <div class="stat">
+            <span class="stat-number">100+</span>
+            <span class="stat-label">curated RSS sources</span>
+        </div>
+        <div class="stat">
+            <span class="stat-number">1–10</span>
+            <span class="stat-label">AI relevance score per article</span>
+        </div>
+        <div class="stat">
+            <span class="stat-number">Daily</span>
+            <span class="stat-label">AI briefings generated</span>
+        </div>
+        <div class="stat">
+            <span class="stat-number">Free</span>
+            <span class="stat-label">always, no paywall</span>
+        </div>
+    </div>
+
+    <!-- Today's headlines -->
+    <section id="headlines" class="section">
+        <p class="section-label">Live feed</p>
+        <h2 class="section-title">Today's top stories</h2>
+        <p class="section-sub">Articles scored and summarized by AI. Trending stories are covered by 3+ independent sources.</p>
+
+        <div class="headlines-grid" role="list" aria-label="Top news articles">
+
+            <article class="headline-card" role="listitem">
+                <div class="score-badge high" aria-label="AI score 9">9</div>
+                <div class="headline-content">
+                    <div class="headline-meta">
+                        <span class="category-tag">AI</span>
+                        <span class="source-tag">· The Verge</span>
+                        <span class="trending-badge" aria-label="Trending — covered by 5 sources">↑ 5 sources</span>
+                    </div>
+                    <h3 class="headline-title">AI models reach new reasoning benchmarks in 2026 evaluations</h3>
+                    <p class="headline-summary">Frontier AI labs report continued advances in multi-step reasoning, with several models now exceeding human performance on standardized tests. The results are reshaping enterprise AI adoption strategies.</p>
+                </div>
+            </article>
+
+            <article class="headline-card" role="listitem">
+                <div class="score-badge high" aria-label="AI score 8">8</div>
+                <div class="headline-content">
+                    <div class="headline-meta">
+                        <span class="category-tag">Tech Policy</span>
+                        <span class="source-tag">· Reuters</span>
+                        <span class="trending-badge" aria-label="Trending — covered by 4 sources">↑ 4 sources</span>
+                    </div>
+                    <h3 class="headline-title">EU AI Act enforcement begins: compliance checklist for 2026</h3>
+                    <p class="headline-summary">The European Union's AI Act enters its enforcement phase, requiring high-risk AI systems to meet new transparency and safety standards. Here's what businesses need to prepare.</p>
+                </div>
+            </article>
+
+            <article class="headline-card" role="listitem">
+                <div class="score-badge high" aria-label="AI score 8">8</div>
+                <div class="headline-content">
+                    <div class="headline-meta">
+                        <span class="category-tag">Tech</span>
+                        <span class="source-tag">· Ars Technica</span>
+                    </div>
+                    <h3 class="headline-title">Apple's on-device AI strategy is reshaping the smartphone market</h3>
+                    <p class="headline-summary">Apple's focus on private, on-device inference is driving a new hardware upgrade cycle and raising competitive pressure on Android manufacturers to match local AI capabilities.</p>
+                </div>
+            </article>
+
+            <article class="headline-card" role="listitem">
+                <div class="score-badge mid" aria-label="AI score 7">7</div>
+                <div class="headline-content">
+                    <div class="headline-meta">
+                        <span class="category-tag">Open Source</span>
+                        <span class="source-tag">· Hacker News</span>
+                        <span class="trending-badge" aria-label="Trending — covered by 3 sources">↑ 3 sources</span>
+                    </div>
+                    <h3 class="headline-title">Open-source LLMs close gap with proprietary models on key benchmarks</h3>
+                    <p class="headline-summary">Community-developed language models continue to match or exceed closed-source counterparts. The trend is accelerating AI access for developers without enterprise budgets.</p>
+                </div>
+            </article>
+
+            <article class="headline-card" role="listitem">
+                <div class="score-badge mid" aria-label="AI score 7">7</div>
+                <div class="headline-content">
+                    <div class="headline-meta">
+                        <span class="category-tag">Business</span>
+                        <span class="source-tag">· Bloomberg</span>
+                    </div>
+                    <h3 class="headline-title">Climate tech investment hits record high as energy transition accelerates</h3>
+                    <p class="headline-summary">Global investment in clean energy and climate technology surpassed previous records in Q1 2026, driven by policy incentives and rapidly falling costs for solar and battery storage.</p>
+                </div>
+            </article>
+
+        </div>
+
+        <p class="headlines-cta">
+            These are representative examples. <a href="/app">Open Weft</a> to see today's live feed scored in real time.
+        </p>
+    </section>
+
+    <!-- Features -->
+    <section class="features-section">
+        <div class="section">
+            <p class="section-label">What Weft does</p>
+            <h2 class="section-title">Your intelligent news layer</h2>
+            <p class="section-sub">Weft sits between 100+ RSS feeds and your attention, filtering signal from noise using AI.</p>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon" aria-hidden="true">⚡</div>
+                    <h3>AI scoring 1–10</h3>
+                    <p>Every article gets an AI relevance score based on your interests. Stop scrolling — start reading what matters.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon" aria-hidden="true">📋</div>
+                    <h3>Daily briefing</h3>
+                    <p>One AI-written summary of the day's key themes, trending stories, and emerging narratives — delivered each morning.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon" aria-hidden="true">💬</div>
+                    <h3>Answer engine</h3>
+                    <p>Ask questions in natural language. Weft answers from your current news feed — like Perplexity, but for your curated sources.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon" aria-hidden="true">📰</div>
+                    <h3>AI summaries</h3>
+                    <p>Get concise, key-points, or ELI5 summaries of any article in seconds. Multiple styles, one click.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon" aria-hidden="true">🔥</div>
+                    <h3>Trending stories</h3>
+                    <p>Stories covered by 3+ independent sources are flagged as trending. Cross-source consensus, instantly visible.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon" aria-hidden="true">🌍</div>
+                    <h3>Discovery mode</h3>
+                    <p>Break out of your filter bubble. Discovery mode surfaces high-quality articles from sources outside your usual reading patterns.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="section">
+        <p class="section-label">How it works</p>
+        <h2 class="section-title">From 100 feeds to one signal</h2>
+        <p class="section-sub">Weft runs a continuous pipeline to turn raw RSS volume into structured, scored, searchable news.</p>
+
+        <div class="steps">
+            <div class="step">
+                <div class="step-num">1</div>
+                <div class="step-content">
+                    <h3>Fetch from 100+ RSS feeds</h3>
+                    <p>Weft continuously polls curated RSS feeds across tech, AI, business, science, world news, politics, sports, and culture. No paywalls, no algorithms — just sources you'd actually read.</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <div class="step-content">
+                    <h3>Score with AI</h3>
+                    <p>Each article is scored 1–10 by AI based on your interest profile. Articles covering the same story from multiple sources get cross-referenced and flagged as trending.</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <div class="step-content">
+                    <h3>Generate summaries on demand</h3>
+                    <p>When you open an article, Weft generates an AI summary tailored to your preferred style — concise, key points, or simple explanation — using Groq's fast inference API.</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-num">4</div>
+                <div class="step-content">
+                    <h3>Deliver the daily briefing</h3>
+                    <p>Each day, a full AI briefing synthesizes the day's themes, top stories, and emerging narratives across all categories — your morning intelligence briefing.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <h2>Personalize your briefing</h2>
+        <p>Sign in to set your interest profile, save articles, and get a daily briefing tuned to you. Free, always.</p>
+        <a href="/app" class="btn-primary">Open Weft free →</a>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <span class="footer-logo">Weft</span>
+        <nav class="footer-links" aria-label="Footer navigation">
+            <a href="/app">App</a>
+            <a href="/llms.txt">llms.txt</a>
+            <a href="/sitemap.xml">Sitemap</a>
+        </nav>
+    </footer>
+
+    <!-- Auth redirect: if user already has a Supabase session, go straight to the app -->
+    <script>
+        (function () {
+            try {
+                var key = Object.keys(localStorage).find(function(k) {
+                    return k.startsWith('sb-') && k.endsWith('-auth-token');
+                });
+                if (key) {
+                    var data = JSON.parse(localStorage.getItem(key));
+                    if (data && (data.access_token || (data.session && data.session.access_token))) {
+                        document.body.classList.add('redirecting');
+                        window.location.replace('/app');
+                    }
+                }
+            } catch (e) { /* silent fail */ }
+        })();
+    </script>
+
+</body>
+</html>
