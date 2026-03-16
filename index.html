@@ -92,6 +92,7 @@
         .app { display: flex; height: 100vh; overflow: hidden; }
         .sidebar { width: 360px; flex-shrink: 0; }
         .loading-placeholder { display: flex; align-items: center; justify-content: center; height: 100vh; background: var(--bg); color: #555; font-family: -apple-system, sans-serif; font-size: 14px; }
+        .deployment-notice { margin-top: 20px; font-size: 11px; color: var(--text-muted, #666); line-height: 1.8; }
         /* Skip link — visually hidden until focused */
         .skip-link { position: absolute; top: -100px; left: 8px; z-index: 10000; background: #7c6af7; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 14px; font-weight: 600; text-decoration: none; transition: top 0.1s; }
         .skip-link:focus { top: 8px; outline: 3px solid #fff; outline-offset: 2px; }
@@ -203,6 +204,7 @@
                 </svg>
                 <h2 data-i18n="empty_title">Select an article</h2>
                 <p data-i18n="empty_sub">Choose an article from the sidebar to read</p>
+                <div id="deploymentNotice" class="deployment-notice" style="display:none;"></div>
             </div>
         </main>
     </div>

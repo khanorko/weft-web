@@ -67,6 +67,7 @@
     { "source": "/api/unsubscribe", "destination": "/api/email-digest.js" },
     { "source": "/api/push-subscribe", "destination": "/api/push-subscribe.js" },
     { "source": "/api/push-notify", "destination": "/api/push-notify.js" },
+    { "source": "/api/deployment-info", "destination": "/api/deployment-info.js" },
     { "source": "/share", "destination": "/api/share.js" },
     { "source": "/briefing/today", "destination": "/api/briefing.js?date=today" },
     { "source": "/briefing/:date", "destination": "/api/briefing.js?date=:date" },

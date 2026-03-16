@@ -1329,6 +1329,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSidebarResize();
     setupThemeToggle();
     setupStreakPanel();
+    loadDeploymentNotice();
 });
 
 function setupEventListeners() {
@@ -3677,4 +3678,74 @@ async function triggerInstallPrompt() {
     const { outcome } = await _deferredInstallPrompt.userChoice;
     if (outcome === 'accepted') localStorage.setItem('pwaInstallDismissed', '1');
     _deferredInstallPrompt = null;
+}
+
+// ==================== DEPLOYMENT NOTICE (AIX-50) ====================
+// Shows when the app was last updated on Vercel, GitHub, and localhost.
+
+async function loadDeploymentNotice() {
+    const el = document.getElementById('deploymentNotice');
+    if (!el) return;
+
+    const isLocalhost = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
+    const lines = [];
+
+    // GitHub: latest commit date (public API, no auth needed)
+    try {
+        const ghRes = await fetch('https://api.github.com/repos/khanorko/weft-web/commits?per_page=1', {
+            headers: { Accept: 'application/vnd.github.v3+json' }
+        });
+        if (ghRes.ok) {
+            const [commit] = await ghRes.json();
+            if (commit?.commit?.committer?.date) {
+                const d = new Date(commit.commit.committer.date);
+                lines.push(`GitHub: ${formatRelativeTime(d)}`);
+            }
+        }
+    } catch (_) { /* silent */ }
+
+    // Vercel: deployment date from API endpoint
+    if (!isLocalhost) {
+        try {
+            const vRes = await fetch('/api/deployment-info');
+            if (vRes.ok) {
+                const data = await vRes.json();
+                if (data?.vercel?.deployedAt) {
+                    const d = new Date(data.vercel.deployedAt);
+                    const sha = data.vercel.sha ? ` (${data.vercel.sha})` : '';
+                    lines.push(`Vercel: ${formatRelativeTime(d)}${sha}`);
+                }
+            }
+        } catch (_) { /* silent */ }
+    }
+
+    // Localhost: last-modified of app.js (reflects local file changes)
+    if (isLocalhost) {
+        try {
+            const r = await fetch('/app.js', { method: 'HEAD' });
+            const lastMod = r.headers.get('Last-Modified') || r.headers.get('last-modified');
+            if (lastMod) {
+                const d = new Date(lastMod);
+                lines.push(`Localhost: ${formatRelativeTime(d)}`);
+            }
+        } catch (_) { /* silent */ }
+    }
+
+    if (lines.length > 0) {
+        el.textContent = lines.join(' · ');
+        el.style.display = '';
+    }
+}
+
+function formatRelativeTime(date) {
+    const now = Date.now();
+    const diff = now - date.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
