@@ -3141,3 +3141,133 @@ function updateThemeIcon(theme) {
         toggle.title = 'Switch to light mode';
     }
 }
+
+// ==================== MOBILE UX (AIX-43) ====================
+
+// ─── Swipe to go back on mobile ───────────────────────────────────────────────
+
+(function setupSwipeBack() {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const SWIPE_THRESHOLD = 60;
+    const EDGE_ZONE = 40; // px from left edge to start swipe
+
+    const content = document.getElementById('articleContent');
+    if (!content) return;
+
+    content.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    content.addEventListener('touchend', (e) => {
+        if (!isMobile) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+        // Swipe right (from left edge or anywhere), horizontal dominant
+        if (dx > SWIPE_THRESHOLD && dy < dx * 0.6 && touchStartX < EDGE_ZONE + 60) {
+            hideMobileContent();
+        }
+    }, { passive: true });
+})();
+
+// ─── Pull to refresh ──────────────────────────────────────────────────────────
+
+(function setupPullToRefresh() {
+    let startY = 0;
+    let pulling = false;
+    const THRESHOLD = 72;
+    const sidebar = document.querySelector('.sidebar');
+    const articleList = document.getElementById('articleList');
+    if (!sidebar || !articleList) return;
+
+    let indicator = null;
+
+    sidebar.addEventListener('touchstart', (e) => {
+        if (articleList.scrollTop === 0) {
+            startY = e.touches[0].clientY;
+            pulling = true;
+        }
+    }, { passive: true });
+
+    sidebar.addEventListener('touchmove', (e) => {
+        if (!pulling) return;
+        const dy = e.touches[0].clientY - startY;
+        if (dy > 0 && dy < THRESHOLD * 1.5) {
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.className = 'pull-refresh-indicator';
+                indicator.textContent = 'Pull to refresh';
+                indicator.setAttribute('aria-live', 'polite');
+                sidebar.prepend(indicator);
+            }
+            indicator.style.opacity = Math.min(dy / THRESHOLD, 1).toString();
+            indicator.textContent = dy >= THRESHOLD ? 'Release to refresh' : 'Pull to refresh';
+        }
+    }, { passive: true });
+
+    sidebar.addEventListener('touchend', (e) => {
+        if (!pulling) return;
+        const dy = e.changedTouches[0].clientY - startY;
+        pulling = false;
+        if (indicator) { indicator.remove(); indicator = null; }
+        if (dy >= THRESHOLD) {
+            fetchArticles();
+            showToast('Refreshing…');
+        }
+    }, { passive: true });
+})();
+
+// ─── PWA Install prompt ────────────────────────────────────────────────────────
+
+let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+
+    // Don't nag if already dismissed or installed
+    if (localStorage.getItem('pwaInstallDismissed')) return;
+
+    // Show install banner after a delay (don't interrupt initial load)
+    setTimeout(showInstallBanner, 3000);
+});
+
+window.addEventListener('appinstalled', () => {
+    _deferredInstallPrompt = null;
+    localStorage.setItem('pwaInstallDismissed', '1');
+    hideInstallBanner();
+});
+
+function showInstallBanner() {
+    if (document.getElementById('installBanner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'installBanner';
+    banner.className = 'install-banner';
+    banner.setAttribute('role', 'banner');
+    banner.innerHTML = `
+        <div class="install-banner-content">
+            <span>📱 Add Weft to your home screen for the best experience</span>
+            <div class="install-banner-actions">
+                <button class="btn-primary install-btn" style="padding:6px 14px; font-size:13px;" onclick="triggerInstallPrompt()">Install</button>
+                <button class="install-dismiss" aria-label="Dismiss install prompt" onclick="hideInstallBanner(true)">✕</button>
+            </div>
+        </div>`;
+    document.body.appendChild(banner);
+    requestAnimationFrame(() => banner.classList.add('visible'));
+}
+
+function hideInstallBanner(dismiss = false) {
+    const banner = document.getElementById('installBanner');
+    if (banner) banner.remove();
+    if (dismiss) localStorage.setItem('pwaInstallDismissed', '1');
+}
+
+async function triggerInstallPrompt() {
+    if (!_deferredInstallPrompt) return;
+    hideInstallBanner();
+    _deferredInstallPrompt.prompt();
+    const { outcome } = await _deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') localStorage.setItem('pwaInstallDismissed', '1');
+    _deferredInstallPrompt = null;
+}
