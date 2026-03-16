@@ -177,6 +177,75 @@ const CATEGORIES = {
             { name: 'Muzli Design', url: 'https://medium.muz.li/feed' },
         ]
     },
+
+    americas: {
+        label: 'Americas',
+        feeds: [
+            { name: 'CBC News', url: 'https://www.cbc.ca/cmlink/rss-topstories' },
+            { name: 'The Globe and Mail', url: 'https://www.theglobeandmail.com/rss/article/category/news/' },
+            { name: 'Buenos Aires Herald', url: 'https://buenosairesherald.com/feed/' },
+            { name: 'Merco Press', url: 'https://en.mercopress.com/rss.xml' },
+            { name: 'Rio Times Online', url: 'https://riotimesonline.com/feed/' },
+            { name: 'Tico Times', url: 'https://ticotimes.net/feed' },
+            { name: 'Global Voices Americas', url: 'https://globalvoices.org/category/world/americas/feed/' },
+            { name: 'Latin America Reports', url: 'https://www.latinamericareports.com/feed/' },
+        ]
+    },
+
+    europe: {
+        label: 'Europe',
+        feeds: [
+            { name: 'EURACTIV', url: 'https://www.euractiv.com/feed/' },
+            { name: 'Der Spiegel Intl', url: 'https://www.spiegel.de/international/index.rss' },
+            { name: 'Politico EU', url: 'https://www.politico.eu/rss' },
+            { name: 'EUobserver', url: 'https://euobserver.com/articles.rss' },
+            { name: 'Balkan Insight', url: 'https://balkaninsight.com/feed/' },
+            { name: 'The Local', url: 'https://www.thelocal.com/feed/' },
+            { name: 'Irish Times', url: 'https://www.irishtimes.com/rss/' },
+            { name: 'Emerging Europe', url: 'https://emerging-europe.com/feed/' },
+        ]
+    },
+
+    asia: {
+        label: 'Asia',
+        feeds: [
+            { name: 'NHK World', url: 'https://www3.nhk.or.jp/rss/news/cat0.xml' },
+            { name: 'The Hindu', url: 'https://www.thehindu.com/feeder/default.rss' },
+            { name: 'Nikkei Asia', url: 'https://asia.nikkei.com/rss/feed/nar' },
+            { name: 'Korea JoongAng Daily', url: 'https://koreajoongangdaily.joins.com/rss/feed' },
+            { name: 'The Jakarta Post', url: 'https://www.thejakartapost.com/feed/' },
+            { name: 'VnExpress Intl', url: 'https://e.vnexpress.net/rss/news/latest.rss' },
+            { name: 'Asia Times', url: 'https://asiatimes.com/feed/' },
+            { name: 'Global Voices Asia', url: 'https://globalvoices.org/category/world/east-asia/feed/' },
+        ]
+    },
+
+    mideast: {
+        label: 'Middle East',
+        feeds: [
+            { name: 'Arab News', url: 'https://www.arabnews.com/rss.xml' },
+            { name: 'Middle East Eye', url: 'https://www.middleeasteye.net/rss' },
+            { name: 'The Times of Israel', url: 'https://www.timesofisrael.com/feed/' },
+            { name: 'Al-Monitor', url: 'https://www.al-monitor.com/rss.xml' },
+            { name: 'Jerusalem Post', url: 'https://www.jpost.com/Rss' },
+            { name: 'Daily Sabah', url: 'https://www.dailysabah.com/rss' },
+            { name: 'Iran International', url: 'https://www.iranintl.com/en/rss' },
+        ]
+    },
+
+    africa: {
+        label: 'Africa',
+        feeds: [
+            { name: 'Daily Maverick', url: 'https://www.dailymaverick.co.za/feed/' },
+            { name: 'Mail & Guardian', url: 'https://mg.co.za/feed/' },
+            { name: 'The East African', url: 'https://www.theeastafrican.co.ke/tea/feed' },
+            { name: 'Punch Nigeria', url: 'https://punchng.com/feed/' },
+            { name: 'The Africa Report', url: 'https://www.theafricareport.com/feed/' },
+            { name: 'RFI Africa', url: 'https://www.rfi.fr/en/africa/rss' },
+            { name: 'AllAfrica', url: 'https://allafrica.com/tools/headlines/rdf/latest/headlines.rdf' },
+            { name: 'Global Voices Africa', url: 'https://globalvoices.org/category/world/sub-saharan-africa/feed/' },
+        ]
+    },
 };
 
 // Flat list derived from CATEGORIES — used everywhere feeds are needed
